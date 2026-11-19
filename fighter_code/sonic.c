@@ -26,10 +26,11 @@
 #define HOMING_FRAMES 24
 #define AIRDASH_SPEED 2.8f
 #define AIRDASH_FRAMES 12
-#define HOMING_ENDLAG 14 // extra frames after the dash where Sonic just falls and cannot act
+#define HOMING_ENDLAG 24 // extra frames after the dash where Sonic just falls and cannot act (v52: 14 -> 24)
+#define HOMING_HITLAG 12 // frames after a hit, popping up and back, before he can act (v52: 0 -> 12)
 #define BOUNCE_ENDLAG 18 // frames after the rebound before Sonic can act
-#define ROLL_BASE 2.2f
-#define ROLL_BONUS 1.5f
+#define ROLL_BASE 3.0f
+#define ROLL_BONUS 1.6f
 #define CHARGE_MAX 45
 #define ROLL_FRAMES 34
 #define LSD_SPEED 3.3f
@@ -94,6 +95,7 @@ INL void EnterState(GOBJ *fighter, int state)
     fd->state_var.state_var1 = 0; // frame counter
     fd->state_var.state_var2 = 0;
     fd->state_var.state_var3 = 0; // set by Sonic_OnHit
+    fd->state_var.state_var4 = 0;
     fd->cb.OnGiveDamage = Sonic_OnHit;
 }
 
@@ -122,11 +124,18 @@ void Homing_Anim(GOBJ *fighter)
 {
     FighterData *fd = fighter->userdata;
     fd->state_var.state_var1++;
-    if (fd->state_var.state_var3)
-    { // hit something: pop up and back, free to act
+    if (fd->state_var.state_var3 && fd->state_var.state_var4 == 0)
+    { // hit something: pop up and back
         fd->phys.self_vel.X = -0.6f * fd->facing_direction;
         fd->phys.self_vel.Y = 2.4f;
-        Fighter_EnterFall(fighter);
+        fd->state_var.state_var4 = 1;
+        return;
+    }
+    if (fd->state_var.state_var4 > 0)
+    { // end lag after a hit
+        fd->state_var.state_var4++;
+        if (fd->state_var.state_var4 > HOMING_HITLAG)
+            Fighter_EnterFall(fighter);
         return;
     }
     int limit = (fd->state_var.state_var2 ? HOMING_FRAMES : AIRDASH_FRAMES) + HOMING_ENDLAG;
@@ -140,6 +149,12 @@ void Homing_Anim(GOBJ *fighter)
 void Homing_Phys(GOBJ *fighter)
 {
     FighterData *fd = fighter->userdata;
+    if (fd->state_var.state_var4 > 0)
+    { // popping up after a hit
+        fd->phys.self_vel.X = fd->phys.self_vel.X * 0.95f;
+        fd->phys.self_vel.Y = fd->phys.self_vel.Y - 0.15f;
+        return;
+    }
     if (fd->state_var.state_var1 > (fd->state_var.state_var2 ? HOMING_FRAMES : AIRDASH_FRAMES))
     { // end lag: no steering, just slow down and fall
         fd->phys.self_vel.X = fd->phys.self_vel.X * 0.9f;
@@ -302,7 +317,7 @@ void Roll_Anim(GOBJ *fighter)
 void Roll_Phys(GOBJ *fighter)
 {
     FighterData *fd = fighter->userdata;
-    fd->phys.self_vel_ground.X = fd->phys.self_vel_ground.X * 0.95f;
+    fd->phys.self_vel_ground.X = fd->phys.self_vel_ground.X * 0.97f;
     Fighter_PhysGround_ApplyVelocity(fighter);
 }
 

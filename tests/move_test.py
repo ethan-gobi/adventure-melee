@@ -103,8 +103,9 @@ if "--faceshot" in sys.argv:
         if k < 40: c.tilt_analog(MAIN, .5, 0)
     def taunt(c, k):
         if k < 2: c.press_button(B.BUTTON_D_UP)
-    MOVES = [("taunt", taunt, 16.0), ("jab", jab, 7.2), ("fsmash", fsmash, 16.0)]
-    SHOTS = {"taunt": (6, 9, 56), "jab": (2,), "fsmash": (16,)}
+    MOVES = [("fsmash 12", fsmash, 12.0), ("fsmash 15", fsmash, 15.0), ("fsmash 17", fsmash, 17.0), ("homing 40", sp(.5, .5), 40.0), ("homing miss", sp(.5, .5), 82.0),
+             ("spin dash tap", sp(.5, 0, hold=3), 40.0), ("spin dash charged", sp(.5, 0, hold=40), 70.0), ("up b", sp(.5, 1), 20.0)]
+    SHOTS = {"fsmash 17": (16, 18), "up b": (3, 10)}
 if "--spinshots" in sys.argv:
     MOVES = [("spin dash charged", sp(1, .5, hold=40), 60.0), ("nair", air(None, None), 20.0), ("homing 40", sp(.5, .5), 40.0)]
     SHOTS = {"spin dash charged": (4, 14, 30, 46, 52, 90), "nair": (5, 12, 18, 40), "homing 40": (6, 30)}

@@ -665,3 +665,16 @@ User on v48: "the mouth isn't even in the right spot", "fix the mouth animations
 - Forward smash: wind-up now peaks on the charge frame (7) with the gem raised back over the shoulder and knees bent, then a lunge (3.5 units forward travel) driving the gem out at chest height, with follow-through. Gem hit, from -> to: damage 18 -> 22, size 2.6 -> 2.7, KBG 104 -> 102 (BKB 35); forearm hit unchanged (12%). Emerald shown frames 3-28. Test v49: f15, 22%, launch at 0% (2.08, 2.01) (was (1.81, 1.74)).
 
 Not tested on v51: port 2 / Kirby load (only the model and visibility tables changed since v46's test), the open mouth on every move.
+
+## v52-v53: neutral B end lag, Sonic CD up B, faster Spin Dash, forward smash gem boomerang (2026-11-19)
+
+File: `builds/Melee - Sonic v53.iso` (only build kept). v52 = all changes; v53 = v52 with the speed trail removed from the rising up B (it pointed sideways).
+
+- Neutral B (Homing Attack), `fighter_code/sonic.c`, from -> to: end lag after a miss 14 -> 24 frames; after a hit Sonic popped up and could act at once -> stays in the move for 12 frames (pops up and back, slowing) before he can act. Test: homing hit 8%, miss lands without acting.
+- Up B (Light Speed Dash), Sonic CD reference: the ball flash is replaced by the Super Peel-Out. He revs his legs into the figure-8 blur in place for 6 frames, then rises (fist up) or flies (head first) with the legs still spinning like wheels (100 degrees per frame, left/right half a turn apart). Sideways version keeps the light-speed trail; rising version has none. Hitbox unchanged. Test: rises 55 units, ends helpless.
+- Spin Dash (ground down B), from -> to: base roll speed 2.2 -> 3.0, charge bonus 1.5 -> 1.6, slowdown 5% -> 3% per frame. Test: tap reached Fox at 40 units on f11 (was f20) and travelled 84 units (was 41); 40-frame charge 116 units. Still 10% (9.1% staled).
+- Forward smash gem, from -> to: damage 22 -> 18, hitbox size 2.7 -> 3.0, and the gem now leaves the hand on the thrust and spins out 4.5 units (and 0.4 up) like a small boomerang, back by frame 24. Test: hits at 10.2, 15.0 and 17.1 units (v49 missed at 16-18); 18% fresh, launch at 0% (1.79, 1.72).
+- Glint: star 2.6 -> 3.8 units long, 0.32 -> 0.5 wide, two diagonal rays added, full ambient (always lit white). Visible in `test_logs/v52_sheet.png`.
+- Load test v53: Fox P1 + Sonic P2 and Kirby P1 + Sonic P2 OK.
+
+Not tested: the exact homing hit end lag in frames, Spin Dash off a ledge at the new speed (it may fly further off stage), forward smash charged damage.

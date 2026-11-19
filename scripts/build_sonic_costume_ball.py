@@ -258,13 +258,13 @@ def flat(bgr, n=8):
     return a_
 
 
-def make_dobj(corner_list, bgra):
+def make_dobj(corner_list, bgra, amb=200):
     """corner_list: [(pos, normal, (u, v), bone)] three per triangle."""
     global prev, dobj_count
     mobj_ = clone(template_dobj.Mobj)
     for ch in 'RGB':
         setattr(mobj_.Material, 'DIF_' + ch, 255)
-        setattr(mobj_.Material, 'AMB_' + ch, 200)
+        setattr(mobj_.Material, 'AMB_' + ch, amb)
     t_ = mobj_.Textures
     t_.Next = None
     t_.EncodeImageData(Array[Byte](np.ascontiguousarray(bgra).tobytes()), bgra.shape[1], bgra.shape[0], GXTexFmt.RGB565, GXTlutFmt.IA8)
@@ -403,10 +403,11 @@ print(f"  dobj {dobj_count - 1:2}: chaos emerald, {len(ec) // 3} triangles")
 # ---- 21: glint on the emerald: a white four-point star in the plane the side-on camera sees (Y/Z), plus one across it
 A3 = lambda *v: np.array(v, dtype=float)   # noqa: E731
 sc_ = []
-for (long_, short_) in ((A3(0, 2.6, 0), A3(0, 0, 0.32)), (A3(0, 0, 2.6), A3(0, 0.32, 0)), (A3(2.0, 0, 0), A3(0, 0.26, 0))):
+for (long_, short_) in ((A3(0, 3.8, 0), A3(0, 0, 0.5)), (A3(0, 0, 3.8), A3(0, 0.5, 0)), (A3(2.8, 0, 0), A3(0, 0.4, 0)),
+                       (A3(0, 1.9, 1.9), A3(0, 0.3, -0.3)), (A3(0, 1.9, -1.9), A3(0, 0.3, 0.3))):   # v52: bigger, plus diagonals
     for off_ in (A3(0.9, 0.5, 0.5), A3(-0.9, 0.5, 0.5)) if long_[0] == 0 else (A3(0, 0.5, 0.5),):
         sc_ += tri([off_ + long_, off_ + short_, off_ - short_], 62) + tri([off_ - long_, off_ - short_, off_ + short_], 62)
-make_dobj(sc_, flat((255, 255, 255)))
+make_dobj(sc_, flat((255, 255, 255)), amb=255)   # full ambient: lit white whatever the stage lighting
 print(f"  dobj {dobj_count - 1:2}: emerald glint, {len(sc_) // 3} triangles")
 
 # ---- 22: light-speed trail for the Light Dash: a tapering streak behind the prop bone, blue at the body fading to white

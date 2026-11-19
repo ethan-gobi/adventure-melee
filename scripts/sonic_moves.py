@@ -4,6 +4,7 @@ Usage: python sonic_moves.py preview <out dir>
        python sonic_moves.py build <PlSnAJ in> <PlSn.dat in> <PlSnAJ out> <PlSn.dat out> <changes.md>
 Key frames are animation frames (0-based); hitbox frames are game frames (1-based), so game frame f shows animation frame f-1.
 """
+import math
 import os
 import sys
 
@@ -258,10 +259,23 @@ EM_T2 = P(EM_T, root=(24, 0, 0), chest=(10, 45, 0), head=(-15, -30, 0), move=3.5
           thighR=(-0.12, -1, -0.65), shinR=(-0.08, -1, -0.55), footR=20)
 EM_F = P(EM_T2, root=(16, 0, 0), chest=(6, 30, 0), armR=(-0.1, -0.25, 1), foreR=(-0.05, -0.3, 1))
 _emhand = lambda f, W: ((W[47] @ np.array([*EM_C, 1.0]))[:3], 0)   # noqa: E731
+
+
+def _emboom(f, W):
+    """v52: the gem leaves the hand on the thrust, spins out 4.5 units like a small boomerang and returns by frame 24."""
+    hand = (W[47] @ np.array([*EM_C, 1.0]))[:3]
+    if f <= 13 or f >= 24:
+        return hand, 0
+    t = (f - 13) / 4.0 if f <= 17 else 1 - (f - 17) / 7.0
+    t = max(0.0, min(1.0, t))
+    t = t * t * (3 - 2 * t)
+    return hand + np.array([0.0, 0.4 * t, 4.5 * t]), (f - 13) * 60
+
+
 move("ForwardSmash", ["AttackS4Hi", "AttackS4S", "AttackS4Lw"], 44,
      [(0, S), (4, EM_W1, "out"), (7, EM_W2), (12, P(EM_W2, chest=(-12, -80, 0))), (14, P(EM_T2, move=2.0), "in"), (16, EM_T2, "out"),
       (21, EM_F), (32, P(EM_W1, root=(0, 0, 0), move=3.5)), (44, P(S, move=3.5))],
-     [(15, 18, [Hit(0, 62, 22, 2.7, 361, 35, 102), Hit(1, 46, 12, 1.5, 361, 30, 95, off=(1.6, 0, 0))])], charge=7, iasa=42, emerald=(3, 28), prop=_emhand)
+     [(15, 18, [Hit(0, 62, 18, 3.0, 361, 35, 102), Hit(1, 46, 12, 1.5, 361, 30, 95, off=(1.6, 0, 0))])], charge=7, iasa=42, emerald=(3, 28), prop=_emboom)
 
 # up smash: the ball spins on the spot for the four weak hits (so they keep connecting), then leaps for the last one
 move("UpSmash", "AttackHi4", 48,
@@ -332,13 +346,31 @@ move("SpinDashCharge", "SpecialSStart", 80, [(0, S), (6, tuck(60, **GB)), (80, t
 move("SpinDash", "SpecialS", 40, [(0, tuck(0, **GB)), (4, tuck(128, hip=(0, -4.8, 0)), "out"), (9, tuck(288, **GB), "in"), (30, tuck(960, **GB), "lin"), (36, P(CROUCH, root=(1080, 0, 0)), "lin"), (40, P(S, root=(1080, 0, 0)))],
      [(1, 32, [ball(10, 50, 35, 75)])], ball=(1, 31))
 LSD_HIT = [(2, 16, [Hit(0, 2, 6, 3.8, 70, 30, 60, off=(0, 1.5, 0))])]
-move("LightSpeedDashUp", "SpecialAirHi", 30,      # ball flash, then a rising corkscrew with one fist up
-     [(0, tuck(0)), (4, tuck(200), "lin"), (6, RISE, "out"), (13, P(RISE, root=(10, 0, 0))), (20, RISE), (26, tuck(300, pivot=(0, 2.0, 0)), "in"), (30, P(FALL, root=(360, 0, 0)))],
-     LSD_HIT, ball=(1, 5))
-move("LightSpeedDashSide", "SpecialHi", 30,       # ball flash, then a head-first flying dash
-     [(0, tuck(0)), (4, tuck(200), "lin"), (6, FLY, "out"), (13, P(FLY, root=(86, 0, 0))), (20, P(FLY, root=(76, 0, 0))), (26, tuck(380, pivot=(0, 2.0, 0)), "in"),
-      (30, P(FALL, root=(360, 0, 0)))],
-     LSD_HIT, ball=(1, 5))
+# up B, v52: Sonic CD reference. He revs his legs into the Super Peel-Out figure-8 blur in place, then shoots off with the
+# legs still spinning like wheels (no ball). Legs advance 100 degrees per frame, left and right half a turn apart.
+
+
+def peel(base, f, rev=1.0):
+    ph = math.radians(100 * f * rev)
+    q = dict(base)
+    for side, off, sx in (("L", 0.0, 0.08), ("R", math.pi, -0.08)):
+        a_ = ph + off
+        q["thigh" + side] = (sx, -math.cos(a_), math.sin(a_) * 0.9 + 0.15)
+        q["shin" + side] = (sx, -math.cos(a_ - 1.1), math.sin(a_ - 1.1) * 0.9)
+        q["foot" + side] = 20.0
+    return P(q)
+
+
+PEEL0 = P(S, ground=0, root=(18, 0, 0), chest=(-10, 0, 0), head=(-20, 0, 0), armL=(0.5, -0.4, -0.8), foreL=(0.3, -0.1, -0.9),
+          armR=(-0.5, -0.4, -0.8), foreR=(-0.3, -0.1, -0.9))
+move("LightSpeedDashUp", "SpecialAirHi", 30,      # peel-out rev, then rising with the legs still spinning and one fist up
+     [(f, peel(PEEL0, f), "lin") for f in range(0, 6)] + [(f, peel(RISE, f), "lin") for f in range(6, 22)] +
+     [(26, tuck(300, pivot=(0, 2.0, 0)), "in"), (30, P(FALL, root=(360, 0, 0)))],
+     LSD_HIT)   # no trail when rising: the trail mesh only points backwards
+move("LightSpeedDashSide", "SpecialHi", 30,       # peel-out rev, then head-first with the legs still spinning
+     [(f, peel(PEEL0, f), "lin") for f in range(0, 6)] + [(f, peel(FLY, f), "lin") for f in range(6, 22)] +
+     [(26, tuck(380, pivot=(0, 2.0, 0)), "in"), (30, P(FALL, root=(360, 0, 0)))],
+     LSD_HIT, trail=(5, 19), prop=lambda f, W: ((W[2][0, 3], W[2][1, 3] + 1.2, W[2][2, 3] - 1.0), 0))
 LD_READY = P(S, root=(-10, 0, 0), chest=(-6, 20, 0), thighL=(0.12, -1, 0.5), shinL=(0.08, -1, 0.1), thighR=(-0.12, -1, -0.5), shinR=(-0.08, -1, -0.5),
              armL=(0.7, -0.6, 0.6), foreL=(0.2, 0.5, 0.8), armR=(-0.7, -0.7, -0.6), foreR=(-0.6, -0.3, -0.7), ground=0.0)
 move("LightDashCharge", "SpecialAirSStart", 80, [(0, S), (6, LD_READY), (18, P(LD_READY, root=(-16, 0, 0))), (80, P(LD_READY, root=(-16, 0, 0)))], [])
