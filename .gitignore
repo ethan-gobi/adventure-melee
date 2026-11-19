@@ -1,0 +1,28 @@
+# Only tools, scripts, code and notes are published. Never game files (Nintendo, Sega): no ISOs, no .dat, no extracted
+# models/textures/animations, no screenshots of the game.
+*
+!*/
+!.gitignore
+!README.md
+!BUILD_NOTES.md
+!MOVESET_PLAN.md
+!scripts/*.py
+!scripts/*.ps1
+!fighter_code/*.c
+!tests/*.py
+!tools/ppc-shim/src/*.c
+# never, even if matched above
+base/
+builds/
+source/
+extract/
+work/
+preview/
+test_logs/
+tools/bl/
+tools/SATools/
+tools/HSDRaw/
+tools/mexTool/
+tools/Dolphin/
+tools/m-ex/
+tools/_dl/
