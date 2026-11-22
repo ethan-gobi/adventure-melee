@@ -31,15 +31,16 @@ def add(b):
     return o
 
 
-# n = body parts 0..n-1. Then: n smile, n+1 ball, n+2 emerald, n+3 glint, n+4 trail, n+5 open mouth.
+# n = body parts 0..n-1. Then: n smile, n+1 ball, n+2 emerald, n+3 glint, n+4 trail, n+5 open mouth, n+6 figure-8, n+7 Insta-Shield.
 a_off, b_off = add(bytes(range(n + 1))), add(bytes([n + 1]))   # body set includes the smile (part n)
 e_off, t_off = add(bytes([n + 2, n + 3])), add(bytes([n + 4]))
 op_off = add(bytes([n + 5]))
+f8_off, is_off = add(bytes([n + 6])), add(bytes([n + 7]))   # Peel-Out figure-8, Insta-Shield
 sets0 = add(struct.pack(">IIII", n + 1, a_off, 1, b_off)); rel += [sets0 + 4, sets0 + 12]                 # group 0: body | ball
-sets1 = add(struct.pack(">IIII", 0, 0, 2, e_off)); rel += [sets1 + 12]                                 # group 1: nothing | emerald + glint
-sets2 = add(struct.pack(">IIII", 0, 0, 1, t_off)); rel += [sets2 + 12]                                 # group 2: nothing | trail
+sets1 = add(struct.pack(">IIIIII", 0, 0, 2, e_off, 1, is_off)); rel += [sets1 + 12, sets1 + 20]        # group 1: nothing | emerald + glint | Insta-Shield
+sets2 = add(struct.pack(">IIIIII", 0, 0, 1, t_off, 1, f8_off)); rel += [sets2 + 12, sets2 + 20]        # group 2: nothing | trail | figure-8
 sets3 = add(struct.pack(">IIII", 0, 0, 1, op_off)); rel += [sets3 + 12]                              # group 3: nothing | open mouth
-t01 = add(struct.pack(">IIIIIIII", 2, sets0, 2, sets1, 2, sets2, 2, sets3)); rel += [t01 + 4, t01 + 12, t01 + 20, t01 + 28]
+t01 = add(struct.pack(">IIIIIIII", 2, sets0, 3, sets1, 3, sets2, 2, sets3)); rel += [t01 + 4, t01 + 12, t01 + 20, t01 + 28]
 for ti, name in ((0, "HighPoly"), (1, "LowPoly"), (2, "MetalPoly"), (3, "MetalMain")):
     ptr = costumes + ti * 4
     if ptr not in rel:

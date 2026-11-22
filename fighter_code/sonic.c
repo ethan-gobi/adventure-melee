@@ -26,22 +26,27 @@
 #define HOMING_FRAMES 24
 #define AIRDASH_SPEED 2.8f
 #define AIRDASH_FRAMES 12
-#define HOMING_ENDLAG 24 // extra frames after the dash where Sonic just falls and cannot act (v52: 14 -> 24)
-#define HOMING_HITLAG 12 // frames after a hit, popping up and back, before he can act (v52: 0 -> 12)
+#define HOMING_ENDLAG 32 // extra frames after the dash where Sonic just falls and cannot act (v52: 14 -> 24, v54: -> 32)
+#define HOMING_HITLAG 20 // frames after a hit, popping up and back, before he can act (v52: 0 -> 12, v54: -> 20)
+#define HOMING_LANDLAG 14.0f // landing lag if he touches the floor during the move (v54; was a normal 4-frame landing)
 #define BOUNCE_ENDLAG 18 // frames after the rebound before Sonic can act
 #define ROLL_BASE 3.0f
 #define ROLL_BONUS 1.6f
 #define CHARGE_MAX 45
+#define CHARGE_HOLD_MAX 180 // the rev can be held this long before it releases by itself (v54: 60 -> 180)
+#define DOWNB_JUMP_FRAMES 120 // two seconds after down B starts (rev + roll), jump cancels it (v54)
 #define ROLL_FRAMES 34
 #define LSD_SPEED 3.3f
 #define LSD_FRAMES 12
-#define LSD_END 22
+#define LSD_START 8 // Peel-Out rev: frames hovering in place before the launch (v54)
+#define LSD_END 30
 #define BOUNCE_HOP 2.4f
 #define BOUNCE_ACCEL 0.45f
 #define BOUNCE_MAX -4.6f
 #define BOUNCE_REBOUND 3.0f
 
 #define INL static inline __attribute__((always_inline))
+typedef union { int i; float f; } IF; // to keep a float in an int state variable
 
 INL float SqrtN(float x)
 {
@@ -185,6 +190,16 @@ void Air_Coll(GOBJ *fighter)
     Fighter_CollAir_IgnoreLedge(fighter, Fighter_EnterLanding);
 }
 
+void Homing_Land(GOBJ *fighter)
+{
+    Fighter_EnterSpecialLanding(fighter, 0, HOMING_LANDLAG);
+}
+
+void Homing_Coll(GOBJ *fighter)
+{
+    Fighter_CollAir_IgnoreLedge(fighter, Homing_Land);
+}
+
 // ---------------------------------------------------------------- Spin Dash
 void SpecialS(GOBJ *fighter)
 {
@@ -281,14 +296,23 @@ void Charge_IASA(GOBJ *fighter)
     FighterData *fd = fighter->userdata;
     fd->state_var.state_var1++;
     int t = fd->state_var.state_var1;
-    if (t >= 8 && (!(fd->input.held & PAD_BUTTON_B) || t >= CHARGE_MAX + 15))
+    if (t >= DOWNB_JUMP_FRAMES && Fighter_IASACheck_JumpF(fighter))
+        return; // jumped out of the rev
+    if (t >= 8 && (!(fd->input.held & PAD_BUTTON_B) || t >= CHARGE_HOLD_MAX))
     {
-        if (t > CHARGE_MAX)
-            t = CHARGE_MAX;
-        float speed = ROLL_BASE + ROLL_BONUS * (float)t / (float)CHARGE_MAX;
+        int c = (t > CHARGE_MAX) ? CHARGE_MAX : t;
+        float speed = ROLL_BASE + ROLL_BONUS * (float)c / (float)CHARGE_MAX;
         EnterState(fighter, ST_ROLL);
+        fd->state_var.state_var5 = t; // frames already spent revving, for the two-second jump cancel
         fd->phys.self_vel_ground.X = speed * fd->facing_direction;
     }
+}
+
+void Roll_IASA(GOBJ *fighter)
+{
+    FighterData *fd = fighter->userdata;
+    if (fd->state_var.state_var5 + fd->state_var.state_var1 >= DOWNB_JUMP_FRAMES)
+        Fighter_IASACheck_JumpF(fighter);
 }
 
 void Ground_Phys(GOBJ *fighter)
@@ -322,27 +346,16 @@ void Roll_Phys(GOBJ *fighter)
 }
 
 // ---------------------------------------------------------------- Light Speed Dash
+// Up B: Super Peel-Out. Rev in place for LSD_START frames, then launch in the direction the stick is held AT THAT MOMENT
+// (straight up-forward if it is neutral), like aiming Fox's up B. Mostly-sideways launches switch to the leaning pose (state 346).
 INL void LsdStart(GOBJ *fighter)
 {
     FighterData *fd = fighter->userdata;
     if (fd->phys.air_state == 0)
         Fighter_SetAirborne(fd);
-    float sx = fd->input.lstick.X, sy = fd->input.lstick.Y;
-    float len = SqrtN(sx * sx + sy * sy);
-    if (len < 0.35f)
-    { // no direction held: up and slightly forward
-        sx = 0.3f * fd->facing_direction;
-        sy = 1.0f;
-        len = SqrtN(sx * sx + sy * sy);
-    }
-    if (sx > 0.2f)
-        fd->facing_direction = 1.0f;
-    if (sx < -0.2f)
-        fd->facing_direction = -1.0f;
-    fd->phys.self_vel.X = LSD_SPEED * sx / len;
-    fd->phys.self_vel.Y = LSD_SPEED * sy / len;
-    float ax = sx < 0.0f ? -sx : sx, ay = sy < 0.0f ? -sy : sy;
-    EnterState(fighter, (ax > ay * 1.2f) ? ST_LSD_SIDE : ST_LSD);
+    fd->phys.self_vel.X = 0;
+    fd->phys.self_vel.Y = 0.12f; // rev phase: hover, drifting up very slightly so he does not land
+    EnterState(fighter, ST_LSD);
 }
 
 void SpecialHi(GOBJ *fighter) { LsdStart(fighter); }
@@ -352,6 +365,33 @@ void Lsd_Anim(GOBJ *fighter)
 {
     FighterData *fd = fighter->userdata;
     fd->state_var.state_var1++;
+    if (fd->state_var.state_var1 == LSD_START)
+    { // launch
+        float sx = fd->input.lstick.X, sy = fd->input.lstick.Y;
+        float len = SqrtN(sx * sx + sy * sy);
+        if (len < 0.35f)
+        { // no direction held: up and slightly forward
+            sx = 0.3f * fd->facing_direction;
+            sy = 1.0f;
+            len = SqrtN(sx * sx + sy * sy);
+        }
+        if (sx > 0.2f)
+            fd->facing_direction = 1.0f;
+        if (sx < -0.2f)
+            fd->facing_direction = -1.0f;
+        float ax = sx < 0.0f ? -sx : sx, ay = sy < 0.0f ? -sy : sy;
+        if (ax > ay * 1.2f && fd->state_id == ST_LSD)
+        { // mostly sideways: same move, leaning pose, picked up at the launch frame
+            ActionStateChange((float)LSD_START, 1, 0, fighter, ST_LSD_SIDE, 0, 0);
+            Fighter_AdvanceScript(fighter);
+            fd->state_var.state_var1 = LSD_START;
+            fd->state_var.state_var3 = 0;
+            fd->cb.OnGiveDamage = Sonic_OnHit;
+        }
+        fd->phys.self_vel.X = LSD_SPEED * sx / len;
+        fd->phys.self_vel.Y = LSD_SPEED * sy / len;
+        return;
+    }
     if (fd->state_var.state_var1 > LSD_END || FrameTimerCheck(fighter) == 0)
         Fighter_EnterSpecialFall(fighter, 1, 1, 0, 1.0f, 15.0f);
 }
@@ -359,7 +399,14 @@ void Lsd_Anim(GOBJ *fighter)
 void Lsd_Phys(GOBJ *fighter)
 {
     FighterData *fd = fighter->userdata;
-    if (fd->state_var.state_var1 > LSD_FRAMES)
+    int t = fd->state_var.state_var1;
+    if (t < LSD_START)
+    { // Peel-Out rev: stay put
+        fd->phys.self_vel.X = 0;
+        fd->phys.self_vel.Y = 0.12f;
+        return;
+    }
+    if (t > LSD_START + LSD_FRAMES)
     {
         fd->phys.self_vel.X = fd->phys.self_vel.X * 0.85f;
         fd->phys.self_vel.Y = fd->phys.self_vel.Y * 0.85f - 0.08f;
@@ -443,9 +490,9 @@ void Bounce_Coll(GOBJ *fighter)
 
 // ---------------------------------------------------------------- state table (state 341 + index)
 __attribute__((used)) static struct FtState move_logic[] = {
-    {302, 0x340511, 0x12, 0x0, Homing_Anim, 0, Homing_Phys, Air_Coll, Fighter_UpdateCameraBox},      // 341 Homing Attack (anim SpecialAirN)
+    {302, 0x340511, 0x12, 0x0, Homing_Anim, 0, Homing_Phys, Homing_Coll, Fighter_UpdateCameraBox},   // 341 Homing Attack (anim SpecialAirN)
     {303, 0x341012, 0x13, 0x0, 0, Charge_IASA, Ground_Phys, Ground_Coll, Fighter_UpdateCameraBox},   // 342 Spin Dash charge (anim SpecialSStart)
-    {304, 0x341012, 0x13, 0x0, Roll_Anim, 0, Roll_Phys, Ground_Coll, Fighter_UpdateCameraBox},       // 343 Spin Dash roll (anim SpecialS)
+    {304, 0x341012, 0x13, 0x0, Roll_Anim, Roll_IASA, Roll_Phys, Ground_Coll, Fighter_UpdateCameraBox}, // 343 Spin Dash roll (anim SpecialS)
     {308, 0x340613, 0x14, 0x0, Lsd_Anim, 0, Lsd_Phys, Lsd_Coll, Fighter_UpdateCameraBox},            // 344 Light Speed Dash (anim SpecialAirHi)
     {313, 0x340614, 0x15, 0x0, Bounce_Anim, 0, Bounce_Phys, Bounce_Coll, Fighter_UpdateCameraBox},   // 345 Bounce Attack (anim SpecialAirLw)
     {307, 0x340613, 0x14, 0x0, Lsd_Anim, 0, Lsd_Phys, Lsd_Coll, Fighter_UpdateCameraBox},            // 346 Light Speed Dash, sideways pose (anim SpecialHi)

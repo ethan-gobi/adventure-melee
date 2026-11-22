@@ -227,8 +227,9 @@ class Anim:
         self.solved = [solve(p) for p in self.poses]
         if prop is not None:            # bone 62 (child of the root, otherwise unused in these moves) carries the Chaos Emerald
             for f_, (W, vals) in enumerate(self.solved):
-                pos, yaw = prop(f_, W)
-                vals[62] = (float(pos[0]), float(pos[1]), float(pos[2]), 0.0, math.radians(yaw), 0.0)
+                r_ = prop(f_, W)
+                pos, yaw, pitch = r_[0], r_[1], (r_[2] if len(r_) > 2 else 0.0)
+                vals[62] = (float(pos[0]), float(pos[1]), float(pos[2]), math.radians(pitch), math.radians(yaw), 0.0)
         if shield_y is not None:        # put the shield bubble bone (61) at a fixed height above the floor
             for W, vals in self.solved:
                 local = np.linalg.inv(W[parent[61]]) @ np.array([W[2][0, 3], shield_y, W[2][2, 3] + 0.3, 1.0])
@@ -392,8 +393,11 @@ def build_script(parts):
     return out + END
 
 
-def install_scripts(pl_in, pl_out, scripts):
-    """scripts: {action name: bytes}. Appends each script to the data section and repoints the action table."""
+def install_scripts(pl_in, pl_out, scripts, pointers=None):
+    """scripts: {action name: bytes}. Appends each script to the data section and repoints the action table.
+    pointers: {action name: [(offset in that script, data offset it must point at)]} for scripts that keep a Go To; each one is
+    written into the script and added to the relocation table."""
+    pointers = pointers or {}
     raw = bytearray(open(pl_in, "rb").read())
     base, acts = action_table(raw, pl_in)
     fsize, dsize, nrel, nroot, nref = struct.unpack(">5I", raw[:20])
@@ -403,7 +407,7 @@ def install_scripts(pl_in, pl_out, scripts):
     for k, a in enumerate(acts):
         if a.SymbolName is not None:
             names.setdefault(a.SymbolName.Value.split("ACTION_")[1].replace("_figatree", ""), []).append(k)
-    done = {}
+    done, new_rel = {}, []
     for name, blob in scripts.items():
         if name not in names:
             raise SystemExit(f"no action named {name}")
@@ -412,6 +416,10 @@ def install_scripts(pl_in, pl_out, scripts):
                 data += b"\0"
             done[blob] = len(data)
             data += blob
+            for off, target in pointers.get(name, []):
+                at_ = done[blob] + off
+                data[at_:at_ + 4] = struct.pack(">I", target)
+                new_rel.append(at_)
         for k in names[name]:
             ent = base - 0x20 + k * 0x18 + 0x0C
             old = struct.unpack(">I", data[ent:ent + 4])[0]
@@ -420,10 +428,14 @@ def install_scripts(pl_in, pl_out, scripts):
             data[ent:ent + 4] = struct.pack(">I", done[blob])
     while len(data) % 4:
         data += b"\0"
+    tail = tail[:4 * nrel] + struct.pack(f">{len(new_rel)}I", *new_rel) + tail[4 * nrel:]      # extra relocation entries
+    nrel += len(new_rel)
     out = struct.pack(">5I", 0x20 + len(data) + len(tail), len(data), nrel, nroot, nref) + bytes(raw[20:0x20]) + bytes(data) + tail
     open(pl_out, "wb").write(out)
     after = {a.name: a for a in sa.load(pl_out) if a.name}
     for name, blob in scripts.items():
+        if name in pointers:
+            continue            # HSDRaw hands pointer fields back as zero, so these are checked by structure only
         if after[name].data[:len(blob)] != blob:
             raise SystemExit(f"{name}: script did not read back")
     print(f"scripts installed: {len(scripts)} actions, {len(done)} new scripts; PlSn.dat {len(raw)} -> {len(out)} bytes")
@@ -495,3 +507,39 @@ def orig_bone_pos(aj_path, action, frame, bones):
                     v[CH[nm]] = FOBJ_Player(t.ToFOBJ()).GetValue(float(frame))
         W.append(mat(v) if parent[i] < 0 else W[parent[i]] @ mat(v))
     return [W[b][:3, 3].copy() for b in bones]
+
+
+def reach(pose, side, target, pole=(0.0, 0.0, 0.0)):
+    """Two-bone IK: aim the `side` ("L"/"R") arm so its hand bone lands on `target` (fighter space, before grounding).
+    `pole` is a world direction the elbow bends toward. Returns a new pose with arm/fore directions set (chest frame)."""
+    a, f, h = ARMS[side]
+    W, _ = solve(dict(pose, ground=0))
+    S_, E_, H_ = W[a][:3, 3], W[f][:3, 3], W[h][:3, 3]
+    L1, L2 = np.linalg.norm(rest_W[f][:3, 3] - rest_W[a][:3, 3]), np.linalg.norm(rest_W[h][:3, 3] - rest_W[f][:3, 3])
+    T = np.array(target, dtype=float)
+    d = T - S_
+    dist = min(np.linalg.norm(d), (L1 + L2) * 0.999)
+    dn = d / (np.linalg.norm(d) + 1e-9)
+    cos_a = (L1 * L1 + dist * dist - L2 * L2) / (2 * L1 * dist)
+    ang = math.acos(max(-1.0, min(1.0, cos_a)))
+    pv = np.array(pole, dtype=float)
+    pv = pv - dn * (pv @ dn)
+    if np.linalg.norm(pv) < 1e-6:
+        pv = np.cross(dn, [0.0, 1.0, 0.0]) if abs(dn[1]) < 0.9 else np.cross(dn, [1.0, 0.0, 0.0])
+    pv = pv / np.linalg.norm(pv)
+    elbow = S_ + L1 * (dn * math.cos(ang) + pv * math.sin(ang))
+    hand = S_ + dn * dist
+    Dc = eul(pose["root"]) @ eul(pose["chest"])
+    out = dict(pose)
+    out["arm" + side] = tuple(Dc.T @ unit(elbow - S_))
+    out["fore" + side] = tuple(Dc.T @ unit(hand - elbow))
+    return out
+
+
+def head_point(pose, direction, out=0.5):
+    """Surface point of Sonic's head (bone 39 geometry) furthest along `direction` (fighter space), pushed `out` beyond it."""
+    W, _ = solve(dict(pose, ground=0))
+    pts = np.array([(W[c[0]] @ np.array([*c[1:4], 1.0]))[:3] for g in bd["groups"] for c in g["c"] if c[0] == 39])
+    dn = unit(direction)
+    p = pts[np.argmax(pts @ dn)]
+    return p + dn * out

@@ -6,6 +6,7 @@ Key frames are animation frames (0-based); hitbox frames are game frames (1-base
 """
 import math
 import os
+import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -49,7 +50,7 @@ def anim(actions, T, keys, **kw):
 def move(label, actions, T, keys, events, prop=None, **plan):
     anim(actions, T, keys, prop=prop)
     HITS[label] = [(f0, f1, h) for f0, f1, hs in events for h in hs]
-    PLAN[label] = dict(actions=[actions] if isinstance(actions, str) else list(actions), events=events, total=T, **plan)
+    PLAN[label] = dict(label=label, actions=[actions] if isinstance(actions, str) else list(actions), events=events, total=T, **plan)
 
 
 def ball(dmg, angle, bkb, kbg, size=4.7, id=0, wdsk=0):
@@ -155,9 +156,12 @@ anim("AppealL", 60, [(f, mirror(p_) if p_ is not S else S) for f, p_ in _wag])
 
 # ------------------------------------------------------------------ classic references (Sonic 1 - SA2 only)
 # crouch: the Sonic 1 duck. Sits right down on his heels, knees up, curled over them with the head tucked in.
-DUCK = P(root=(6, 0, 0), chest=(50, 0, 0), head=(-22, 0, 0), footL=-8, footR=-8,
-         thighL=(0.3, 0.5, 1), shinL=(0.08, -1, -0.62), thighR=(-0.3, 0.42, 1), shinR=(-0.08, -1, -0.66),
-         armL=(0.55, -0.7, 1), foreL=(-0.35, -0.45, 1), armR=(-0.55, -0.7, 1), foreR=(0.35, -0.45, 1))
+# v56 crouch, after the user's reference picture: sits low on his heels, curled forward with his head bowed toward his knees
+# and his right glove over the top of his head; left arm round his shins. The glove is placed with reach() on the head surface.
+_DB = P(root=(15, 0, 0), chest=(48, 0, 0), head=(40, 0, 0), footL=-5, footR=-5,
+        thighL=(0.22, 0.25, 1), shinL=(0.06, -1, -0.5), thighR=(-0.22, 0.2, 1), shinR=(-0.06, -1, -0.55),
+        armL=(0.45, -0.8, 0.8), foreL=(-0.1, -0.5, 1))
+DUCK = reach(_DB, "R", head_point(_DB, (-0.6, 0.7, 0.6), 0.9), pole=(-1, 0.3, -0.5))
 anim("Squat", 8, [(0, S), (8, DUCK, "out")])
 anim("SquatWait", 158, [(0, DUCK), (79, P(DUCK, chest=(53, 0, 0))), (158, DUCK)])
 anim("SquatRv", 10, [(0, DUCK), (10, S)])
@@ -210,11 +214,34 @@ EM_C = tuple(_json.load(open('C:/adventure-melee/work/v19/emerald.json'))['centr
 EM_W = P(S, root=(4, 0, 0), chest=(4, -55, 0), head=(0, 30, 0), armR=(-0.5, -0.3, -0.9), foreR=(-0.3, 0.2, 0.6), armL=(0.5, -0.4, 0.9), foreL=(0.1, 0.3, 1))
 EM_T = P(S, root=(12, 0, 0), chest=(8, 40, 0), head=(-8, -25, 0), armR=(-0.05, 0.08, 1), foreR=(0.0, 0.08, 1), armL=(0.6, -0.7, -0.6), foreL=(0.5, -0.2, 0.4),
          thighL=(0.12, -1, 0.75), shinL=(0.08, -1, -0.1), thighR=(-0.12, -1, -0.45), shinR=(-0.08, -1, -0.6))
-# forward tilt: the side kick again (swapped with the forward smash in v47)
-FT_EX = P(K_EX, root=(0, -88, 36), thighL=(1, 0.22, 0), shinL=(1, 0.26, 0))
-move("ForwardTilt", ["AttackS3Hi", "AttackS3HiS", "AttackS3S", "AttackS3LwS", "AttackS3Lw"], 28,
-     [(0, S), (5, K_CH), (7, FT_EX, "out"), (11, FT_EX), (16, K_CH), (28, S)],
-     [(8, 10, leg("L", 9, 361, 12, 95, size=2.5, shin_dmg=8))], iasa=26)
+def boom(far, t0, t_peak, t_back, spin=45):
+    """Emerald flight for the prop bone: in the hand until frame t0, out to `far` (fighter space) by t_peak, back in the hand by t_back."""
+    far = np.array(far, dtype=float)
+
+    def f_(f, W):
+        hand = (W[47] @ np.array([*EM_C, 1.0]))[:3]
+        if f <= t0 or f >= t_back:
+            return hand, 0
+        if f <= t_peak:
+            t = (f - t0) / float(t_peak - t0)
+            t = 1 - (1 - t) ** 2
+        else:
+            t = 1 - (f - t_peak) / float(t_back - t_peak)
+            t = t * t * (3 - 2 * t)
+        return hand + (far - hand) * t, (f - t0) * spin
+    return f_
+
+
+# forward tilt (v54): Chaos Emerald boomerang, moved here from the down tilt. A quick underhand flick from standing; the gem
+# spins out 17 units at waist height and comes back. It is a hitbox carried by the move, not a separate projectile.
+BT_W = P(S, chest=(0, -50, 0), head=(0, 30, 0), armR=(-0.6, -0.5, -0.7), foreR=(-0.4, -0.2, 0.5), armL=(0.5, -0.5, 0.8), foreL=(0.2, 0.2, 1))
+BT_T = P(S, root=(14, 0, 0), chest=(10, 40, 0), head=(-10, -25, 0), armR=(-0.1, -0.35, 1), foreR=(0.0, -0.3, 1), armL=(0.6, -0.7, -0.6), foreL=(0.5, -0.2, 0.4),
+         thighL=(0.12, -1, 0.6), shinL=(0.08, -1, -0.1), thighR=(-0.12, -1, -0.4), shinR=(-0.08, -1, -0.5))
+BT_C = P(S, root=(6, 0, 0), chest=(6, 15, 0), armR=(-0.2, -0.4, 1), foreR=(-0.1, 0.0, 1))
+move("ForwardTilt", ["AttackS3Hi", "AttackS3HiS", "AttackS3S", "AttackS3LwS", "AttackS3Lw"], 32,
+     [(0, S), (3, BT_W), (6, BT_T, "out"), (13, BT_T), (25, BT_C), (32, S)],
+     [(6, 13, [Hit(0, 62, 8, 2.2, 70, 25, 60)]), (14, 25, [Hit(1, 62, 5, 2.0, 80, 15, 50)])], iasa=29, emerald=(5, 27),
+     prop=boom((0.0, 5.5, 17.0), 5, 13, 25))
 
 
 UTF = dict(ground=0, pivot=(0, 2.0, 0), thighL=(0.12, -1, 0.3), shinL=(0.08, -1, 0.12), thighR=(-0.12, -1, 0.3), shinR=(-0.08, -1, 0.12), footL=40, footR=40,
@@ -224,29 +251,13 @@ move("UpTilt", "AttackHi3", 28,
       (15, tuck(-320, pivot=(0, 2.0, 0), hip=(0, 1.5, 0)), "lin"), (20, P(LAND, root=(-360, 0, 0)), "lin"), (28, P(S, root=(-360, 0, 0)))],
      [(6, 10, [Hit(0, 16, 8, 2.6, 92, 35, 95, off=(1.6, 0, 0)), Hit(1, 10, 8, 2.6, 92, 35, 95, off=(1.6, 0, 0)), Hit(2, 14, 7, 2.0, 92, 35, 95, off=(2.4, 0, 0))])], iasa=24)
 
-# down tilt: Chaos Emerald boomerang. From the duck he flicks the emerald out along the floor; it spins out 13 units and comes back.
-# The emerald rides the prop bone, so it is a moving hitbox tied to the move, not a separate projectile.
-BM_W = P(DUCK, chest=(40, -45, 0), armR=(-0.6, -0.3, -0.8), foreR=(-0.4, 0.3, 0.3))
-BM_T = P(DUCK, chest=(46, 35, 0), head=(-30, 0, 0), armR=(-0.1, -0.15, 1), foreR=(0.0, -0.1, 1))
-BM_C = P(DUCK, chest=(48, 10, 0), armR=(-0.3, -0.4, 1), foreR=(-0.1, 0.1, 1))
-
-
-def boomerang(f, W):
-    hand = (W[47] @ np.array([*EM_C, 1.0]))[:3]
-    far = np.array([0.0, 3.4, 17.0])
-    if f <= 5:
-        return hand, 0
-    if f <= 13:
-        t = (f - 5) / 8.0
-        t = 1 - (1 - t) ** 2
-    else:
-        t = max(0.0, 1 - (f - 13) / 12.0)
-        t = t * t * (3 - 2 * t)
-    return hand + (far - hand) * t, (f - 5) * 45
-
-
-move("DownTilt", "AttackLw3", 34, [(0, DUCK), (3, BM_W), (6, BM_T, "out"), (13, BM_T), (25, BM_C), (34, DUCK)],
-     [(6, 13, [Hit(0, 62, 8, 2.2, 70, 25, 60)]), (14, 25, [Hit(1, 62, 5, 2.0, 80, 15, 50)])], iasa=31, emerald=(5, 27), prop=boomerang)
+# down tilt (v54): Somersault (SA2). From the duck he rolls forward along the floor as a ball (7 units), then pops a low kick
+# out of the roll that launches upward for combos.
+SOM_K = P(DUCK, root=(366, 0, 0), chest=(35, 0, 0), thighR=(-0.2, -0.05, 1), shinR=(-0.15, 0.0, 1), footR=-20, move=7.5)
+move("DownTilt", "AttackLw3", 26,
+     [(0, DUCK), (3, tuck(45, hip=(0, -7.1, 0), move=1.0)), (10, tuck(360, hip=(0, -7.1, 0), move=7.0), "lin"), (12, SOM_K, "out"), (15, SOM_K),
+      (20, P(DUCK, root=(366, 0, 0), move=7.5)), (26, P(DUCK, root=(366, 0, 0), move=7.5))],
+     [(4, 10, [ball(4, 60, 0, 100, size=4.0, wdsk=22)]), (12, 14, leg("R", 5, 85, 40, 70, size=2.6, shin_dmg=5))], iasa=23, ball=(3, 11))
 
 
 # forward smash: Chaos Emerald thrust (swapped with the forward tilt in v47). v49: the wind-up peaks on the charge frame (7) with
@@ -261,21 +272,14 @@ EM_F = P(EM_T2, root=(16, 0, 0), chest=(6, 30, 0), armR=(-0.1, -0.25, 1), foreR=
 _emhand = lambda f, W: ((W[47] @ np.array([*EM_C, 1.0]))[:3], 0)   # noqa: E731
 
 
-def _emboom(f, W):
-    """v52: the gem leaves the hand on the thrust, spins out 4.5 units like a small boomerang and returns by frame 24."""
-    hand = (W[47] @ np.array([*EM_C, 1.0]))[:3]
-    if f <= 13 or f >= 24:
-        return hand, 0
-    t = (f - 13) / 4.0 if f <= 17 else 1 - (f - 17) / 7.0
-    t = max(0.0, min(1.0, t))
-    t = t * t * (3 - 2 * t)
-    return hand + np.array([0.0, 0.4 * t, 4.5 * t]), (f - 13) * 60
-
-
-move("ForwardSmash", ["AttackS4Hi", "AttackS4S", "AttackS4Lw"], 44,
+# v54: the forward smash is a full boomerang throw. Same wind-up (charge on frame 7); on frame 15 the gem leaves his hand,
+# spins out 24 units at chest height by frame 24 and is back in his hand by frame 38. Strong on the way out, weak on the way back.
+FS_C = P(EM_F, root=(8, 0, 0), chest=(4, 20, 0), armR=(-0.2, -0.3, 1), foreR=(-0.1, 0.05, 1))
+move("ForwardSmash", ["AttackS4Hi", "AttackS4S", "AttackS4Lw"], 50,
      [(0, S), (4, EM_W1, "out"), (7, EM_W2), (12, P(EM_W2, chest=(-12, -80, 0))), (14, P(EM_T2, move=2.0), "in"), (16, EM_T2, "out"),
-      (21, EM_F), (32, P(EM_W1, root=(0, 0, 0), move=3.5)), (44, P(S, move=3.5))],
-     [(15, 18, [Hit(0, 62, 18, 3.0, 361, 35, 102), Hit(1, 46, 12, 1.5, 361, 30, 95, off=(1.6, 0, 0))])], charge=7, iasa=42, emerald=(3, 28), prop=_emboom)
+      (22, EM_F), (38, FS_C), (50, P(S, move=3.5))],
+     [(15, 24, [Hit(0, 62, 17, 2.8, 361, 35, 100)]), (25, 38, [Hit(1, 62, 8, 2.4, 361, 20, 70)])], charge=7, iasa=46, emerald=(3, 40),
+     prop=boom((0.0, 7.0, 27.0), 14, 24, 38, spin=50))
 
 # up smash: the ball spins on the spot for the four weak hits (so they keep connecting), then leaps for the last one
 move("UpSmash", "AttackHi4", 48,
@@ -293,7 +297,7 @@ move("DownSmash", "AttackLw4", 44, [(0, S), (4, CROUCH), (7, SPLIT, "out"), (10,
 
 # ------------------------------------------------------------------ aerials
 move("NeutralAir", "AttackAirN", 39, [(0, FALL), (3, tuck(60)), (27, tuck(780), "lin"), (33, P(FALL, root=(720, 0, 0)), "lin"), (39, P(FALL, root=(720, 0, 0)))],
-     [(4, 9, [ball(9, 361, 15, 95)]), (10, 27, [ball(5, 361, 10, 80, size=4.1)])], aerial=(3, 30), iasa=36, ball=(4, 29))
+     [(4, 9, [ball(9, 361, 15, 95, size=5.8)]), (10, 27, [ball(5, 361, 10, 80, size=4.1)])], aerial=(3, 30), iasa=36, ball=(4, 29), insta=(4, 10))   # early hit = Insta-Shield (Sonic 3): wider for 6 frames
 
 AX_W = P(TUCK, root=(-25, 0, 0), pivot=(0, 1.5, 0), armL=(0.8, 0.6, 0.3), foreL=(0.5, 1, 0.3), armR=(-0.8, 0.6, 0.3), foreR=(-0.5, 1, 0.3))
 AX_UP = P(ground=0, pivot=(0, 1.5, 0), root=(-38, 0, 0), chest=(-10, 0, 0), head=(20, 0, 0), thighR=(0, 1, 0.45), shinR=(0, 1, 0.4), footR=25,
@@ -342,35 +346,38 @@ FLY = P(ground=0, pivot=(0, 2.0, 0), root=(80, 0, 0), chest=(-12, 0, 0), head=(-
 GB = dict(hip=(0, -7.1, 0))
 move("HomingAttack", ["SpecialAirN", "SpecialN"], 40, [(0, FALL), (3, tuck(90)), (40, tuck(1200), "lin")],
      [(1, 40, [ball(8, 60, 40, 70)])], ball=(3, 0))
-move("SpinDashCharge", "SpecialSStart", 80, [(0, S), (6, tuck(60, **GB)), (80, tuck(3020, **GB), "lin")], [], ball=(7, 0))
+move("SpinDashCharge", "SpecialSStart", 190, [(0, S), (6, tuck(60, **GB)), (190, tuck(60 + 184 * 40, **GB), "lin")], [], ball=(7, 0))
 move("SpinDash", "SpecialS", 40, [(0, tuck(0, **GB)), (4, tuck(128, hip=(0, -4.8, 0)), "out"), (9, tuck(288, **GB), "in"), (30, tuck(960, **GB), "lin"), (36, P(CROUCH, root=(1080, 0, 0)), "lin"), (40, P(S, root=(1080, 0, 0)))],
      [(1, 32, [ball(10, 50, 35, 75)])], ball=(1, 31))
-LSD_HIT = [(2, 16, [Hit(0, 2, 6, 3.8, 70, 30, 60, off=(0, 1.5, 0))])]
-# up B, v52: Sonic CD reference. He revs his legs into the Super Peel-Out figure-8 blur in place, then shoots off with the
-# legs still spinning like wheels (no ball). Legs advance 100 degrees per frame, left and right half a turn apart.
+# up B, v54: Super Peel-Out (Sonic CD). He revs in place for 8 frames with his feet blurred into the red figure-8 (model part
+# 24), then shoots off still running on it: upright when rising, leaning hard when going sideways. No ball, no corkscrew.
+RUN_A = dict(thighL=(0.08, -0.7, 0.75), shinL=(0.08, -0.95, -0.3), footL=-10, thighR=(-0.08, -0.75, -0.65), shinR=(-0.08, -0.25, -1), footR=40)
+RUN_B = dict(thighR=(-0.08, -0.7, 0.75), shinR=(-0.08, -0.95, -0.3), footR=-10, thighL=(0.08, -0.75, -0.65), shinL=(0.08, -0.25, -1), footL=40)
+PEEL_REV = P(S, ground=0, root=(28, 0, 0), chest=(-8, 0, 0), head=(-22, 0, 0), armL=(0.5, -0.5, -0.8), foreL=(0.35, -0.2, -0.9),
+             armR=(-0.5, -0.5, -0.8), foreR=(-0.35, -0.2, -0.9))
+PEEL_UP = P(PEEL_REV, root=(8, 0, 0), head=(-32, 0, 0))
+PEEL_SIDE = P(PEEL_REV, root=(40, 0, 0), head=(-36, 0, 0))
 
 
-def peel(base, f, rev=1.0):
-    ph = math.radians(100 * f * rev)
-    q = dict(base)
-    for side, off, sx in (("L", 0.0, 0.08), ("R", math.pi, -0.08)):
-        a_ = ph + off
-        q["thigh" + side] = (sx, -math.cos(a_), math.sin(a_) * 0.9 + 0.15)
-        q["shin" + side] = (sx, -math.cos(a_ - 1.1), math.sin(a_ - 1.1) * 0.9)
-        q["foot" + side] = 20.0
-    return P(q)
+def peel_keys(fly):
+    ks = []
+    for f in range(0, 27):
+        base = PEEL_REV if f < 8 else fly
+        if f in (8, 9):      # ease from the rev lean into the flight lean
+            base = lerp_pose(PEEL_REV, fly, (f - 7) / 3.0)
+        ks.append((f, P(base, **(RUN_A if (f // 2) % 2 == 0 else RUN_B)), "lin"))   # legs swap every 2 frames: a blur
+    return ks + [(32, SPRING)]
 
 
-PEEL0 = P(S, ground=0, root=(18, 0, 0), chest=(-10, 0, 0), head=(-20, 0, 0), armL=(0.5, -0.4, -0.8), foreL=(0.3, -0.1, -0.9),
-          armR=(-0.5, -0.4, -0.8), foreR=(-0.3, -0.1, -0.9))
-move("LightSpeedDashUp", "SpecialAirHi", 30,      # peel-out rev, then rising with the legs still spinning and one fist up
-     [(f, peel(PEEL0, f), "lin") for f in range(0, 6)] + [(f, peel(RISE, f), "lin") for f in range(6, 22)] +
-     [(26, tuck(300, pivot=(0, 2.0, 0)), "in"), (30, P(FALL, root=(360, 0, 0)))],
-     LSD_HIT)   # no trail when rising: the trail mesh only points backwards
-move("LightSpeedDashSide", "SpecialHi", 30,       # peel-out rev, then head-first with the legs still spinning
-     [(f, peel(PEEL0, f), "lin") for f in range(0, 6)] + [(f, peel(FLY, f), "lin") for f in range(6, 22)] +
-     [(26, tuck(380, pivot=(0, 2.0, 0)), "in"), (30, P(FALL, root=(360, 0, 0)))],
-     LSD_HIT, trail=(5, 19), prop=lambda f, W: ((W[2][0, 3], W[2][1, 3] + 1.2, W[2][2, 3] - 1.0), 0))
+def f8prop(f, W):
+    """figure-8 under the feet: follows the hips and leans with the body."""
+    R = W[2][:3, :3]
+    return W[2][:3, 3] + R @ np.array([0.0, -9.0, 0.3]), 0, math.degrees(math.atan2(R[2, 1], R[1, 1]))
+
+
+LSD_HIT = [(9, 29, [Hit(0, 2, 6, 3.8, 70, 30, 60, off=(0, 1.5, 0))])]   # v57: f9-22 -> f9-29, the whole dash (it ends at f30)
+move("PeelOutUp", "SpecialAirHi", 32, peel_keys(PEEL_UP), LSD_HIT)
+move("PeelOutSide", "SpecialHi", 32, peel_keys(PEEL_SIDE), LSD_HIT)
 LD_READY = P(S, root=(-10, 0, 0), chest=(-6, 20, 0), thighL=(0.12, -1, 0.5), shinL=(0.08, -1, 0.1), thighR=(-0.12, -1, -0.5), shinR=(-0.08, -1, -0.5),
              armL=(0.7, -0.6, 0.6), foreL=(0.2, 0.5, 0.8), armR=(-0.7, -0.7, -0.6), foreR=(-0.6, -0.3, -0.7), ground=0.0)
 move("LightDashCharge", "SpecialAirSStart", 80, [(0, S), (6, LD_READY), (18, P(LD_READY, root=(-16, 0, 0))), (80, P(LD_READY, root=(-16, 0, 0)))], [])
@@ -407,6 +414,65 @@ DROP = ("Graphic", "Sound", "SFX", "Aura", "Color Animation", "Wind", "Sword")
 SPECIALS = []
 
 
+# ------------------------------------------------------------------ sounds (v56)
+# Sonic's own bank (sonic.ssm, bank 56): IDs 560000 + index, see scripts/make_sonic_soundbank.py. SA1 effects from P_SONICTAILS
+# bank 03 and short grunts from the English voice bank. Melee's shared whooshes: 166 light, 165 medium, 164 heavy, 119 smash.
+SB = 560000
+HOMING, LD_HOLD, LD_LAUNCH, LD_ATTACK, SPIN_CHARGE, SPIN_RELEASE, SWIPE = (SB + i for i in range(7))
+GRUNT = [SB + 7 + i for i in range(5)]
+HURT = [SB + 12, SB + 13]
+W1, W2, W3, WS, JUMP = 166, 165, 164, 119, 74
+SW, SND, VOICE = 1, 0, 2            # "Behavior": 1 = swing, 0 = sound, 2 = voice
+SFX = {
+    "JumpF": [(2, JUMP, SND)], "JumpB": [(2, JUMP, SND)], "JumpAerialF": [(2, JUMP, SND)], "JumpAerialB": [(2, JUMP, SND)],
+    "Jab1": [(2, W1, SW)], "Jab2": [(2, W1, SW)], "Jab3": [(4, W2, SW), (4, GRUNT[0], VOICE)],
+    "DashAttack": [(4, SPIN_RELEASE, SND)],
+    "ForwardTilt": [(5, SWIPE, SND)], "UpTilt": [(4, W2, SW)], "DownTilt": [(3, SPIN_RELEASE, SND), (11, W1, SW)],
+    "ForwardSmash": [(14, WS, SND), (14, GRUNT[1], VOICE), (16, SWIPE, SND)], "UpSmash": [(7, SPIN_CHARGE, SND), (19, GRUNT[2], VOICE)],
+    "DownSmash": [(6, W3, SW), (6, GRUNT[3], VOICE)],
+    "NeutralAir": [(3, W1, SW)], "ForwardAir": [(9, W3, SW), (9, GRUNT[4], VOICE)], "BackAir": [(4, W3, SW)],
+    "UpAir": [(4, W2, SW)], "DownAir": [(5, W3, SW)],
+    "HomingAttack": [(1, HOMING, SND), (1, GRUNT[0], VOICE)],
+    "SpinDashCharge": [(7, SPIN_CHARGE, SND)] + [(7 + 26 * k, SPIN_CHARGE, SND) for k in range(1, 7)],
+    "SpinDash": [(1, SPIN_RELEASE, SND)],
+    "PeelOutUp": [(1, LD_HOLD, SND), (9, LD_LAUNCH, SND), (9, GRUNT[2], VOICE)],
+    "PeelOutSide": [(1, LD_HOLD, SND), (9, LD_LAUNCH, SND), (9, GRUNT[2], VOICE)],
+    "LightDashCharge": [(2, LD_HOLD, SND)], "LightDash": [(1, LD_LAUNCH, SND), (1, GRUNT[1], VOICE)],
+    "BounceAttack": [(3, W2, SW)],
+}
+
+
+def remap_voices(pl_path, tbase, acts_list):
+    """Point every voice/sound ID of Falcon's bank (60000-69999) in the scripts Sonic keeps at Sonic's own bank, in place:
+    damage and KO sounds -> hurt clips, everything else -> grunts. Returns the number of IDs changed."""
+    raw = bytearray(open(pl_path, "rb").read())
+    done, n = set(), 0
+    for k, a in enumerate(acts_list):
+        if not a.cmds:
+            continue
+        loc = 0x20 + struct.unpack(">I", raw[tbase + k * 0x18 + 0x0C: tbase + k * 0x18 + 0x10])[0]
+        if loc in done or loc <= 0x20:
+            continue
+        done.add(loc)
+        data = bytearray(raw[loc:loc + len(a.data)])
+        if bytes(data) != a.data:
+            continue
+        hurt = a.name and ("Damage" in a.name or "Dead" in a.name or "Fura" in a.name)
+        for c in sa.parse(bytes(data)):
+            for key in [k_ for k_ in c["params"] if k_.startswith("SFX ID")]:
+                v = c["params"][key]
+                if 60000 <= v < 70000:
+                    sa.set_param(data, c, key, (HURT[v % 2] if hurt else GRUNT[v % 5]))
+                    n += 1
+        raw[loc:loc + len(data)] = data
+    open(pl_path, "wb").write(raw)
+    return n
+
+
+# scripts that keep the game's own commands and only get a command put in front
+PREPEND = {}   # v55 put the Peel-Out figure-8 on the Run feet; removed in v56 (looked wrong in game)
+
+
 def make_script(plan, charge_bytes):
     items = []
     ev = plan["events"]
@@ -434,6 +500,15 @@ def make_script(plan, charge_bytes):
         items.append((max(1, first - 3), 0, MOUTH(1)))                    # mouth opens as he attacks (a shout)
         if last + 5 < plan["total"]:
             items.append((last + 5, 5, MOUTH(0)))
+    CMS = lambda g, v: cmd("Change Model State", **{"Struct ID": g, "Object ID": v})   # noqa: E731
+    for f_, sid, beh in SFX.get(plan["label"], []):
+        items.append((f_, 0, cmd("Sound Effect", Behavior=beh, Volume=127, Panning=64, **{"SFX ID": sid})))
+    if plan.get("insta"):          # group 1 set 2 = Insta-Shield crescent
+        items += [(plan["insta"][0], 0, CMS(1, 2)), (plan["insta"][1], 5, CMS(1, 0))]
+    if plan.get("fig8"):           # group 2 set 2 = Peel-Out figure-8
+        items.append((plan["fig8"][0], 0, CMS(2, 2)))
+        if plan["fig8"][1]:
+            items.append((plan["fig8"][1], 5, CMS(2, 0)))
     if plan.get("trail"):
         items += [(plan["trail"][0], 0, cmd("Change Model State", **{"Struct ID": 2, "Object ID": 1})),
                   (plan["trail"][1], 5, cmd("Change Model State", **{"Struct ID": 2, "Object ID": 0}))]
@@ -501,7 +576,28 @@ if __name__ == "__main__":
                     ed(b, sa.parse(bytes(b))[0])
                 out += bytes(b)
             scripts[name] = out
-        install_scripts(tmp_pl, pl_out, scripts)
+        pointers = {}
+        tb0, ta0 = action_table(bytearray(open(tmp_pl, "rb").read()), tmp_pl)
+        print("Falcon voice IDs pointed at Sonic's bank:", remap_voices(tmp_pl, tb0, sa.load(tmp_pl)))
+        raw_tmp = open(tmp_pl, "rb").read()
+        tbase, tacts = action_table(bytearray(raw_tmp), tmp_pl)
+        for name, (cname, cargs) in PREPEND.items():
+            a = acts[name]
+            pre = cmd(cname, **cargs)
+            if a.cmds and a.cmds[-1]["name"] == "Go To" and not any(c["name"] in ("Go To", "Subroutine", "Return") for c in a.cmds[:-1]):
+                # the script loops with a Go To back into the game's own copy: keep that pointer (it needs a relocation entry)
+                k = next(i for i, t in enumerate(tacts) if t.SymbolName is not None and t.SymbolName.Value.endswith(f"ACTION_{name}_figatree"))
+                loc = struct.unpack(">I", raw_tmp[tbase + k * 0x18 + 0x0C: tbase + k * 0x18 + 0x10])[0]
+                goto = a.cmds[-1]["off"]
+                target = struct.unpack(">I", raw_tmp[0x20 + loc + goto + 4: 0x20 + loc + goto + 8])[0]
+                scripts[name] = pre + a.data[:goto + 8]
+                pointers[name] = [(len(pre) + goto + 4, target)]
+                print(f"{name}: command put in front; its loop still jumps to the original script at 0x{target:X} (script was at 0x{loc:X})")
+            elif a.cmds and a.cmds[-1]["name"] == "End Of Script" and not any(c["name"] in ("Go To", "Subroutine", "Return") for c in a.cmds):
+                scripts[name] = pre + a.data[:a.cmds[-1]["off"] + a.cmds[-1]["len"]]
+            else:
+                print("prepend skipped (script has other jumps):", name)
+        install_scripts(tmp_pl, pl_out, scripts, pointers)
         os.remove(tmp_pl)
         with open(report, "w") as f:
             f.write("# v19 moves\n\n## New attacks (script written from scratch; game frames)\n\n")

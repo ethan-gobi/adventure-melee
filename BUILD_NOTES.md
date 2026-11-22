@@ -678,3 +678,33 @@ File: `builds/Melee - Sonic v53.iso` (only build kept). v52 = all changes; v53 =
 - Load test v53: Fox P1 + Sonic P2 and Kirby P1 + Sonic P2 OK.
 
 Not tested: the exact homing hit end lag in frames, Spin Dash off a ledge at the new speed (it may fly further off stage), forward smash charged damage.
+
+## v54-v56: move swaps, Peel-Out aim, down B jump cancel, movement feel, crouch, Sonic Adventure sounds (2026-11-20/22)
+
+Files: v54, v55 and v56 were built in turn (only the newest ISO is kept). Package `work/sonic_package_v56.zip` (model `work/v19/PlSnNr_v54.dat`).
+
+User: "fix the cd upb", "make fsmash boomerang", "add endlag to neutral special", "make down b jump cancelable after two seconds", "up b looks super weird", "increase his speed a little bit and his friction, his wavedash is a tadbit too strong and he feels super slippery", "make the downtilt the forward tilt and make the new down tilt the somersault", "fix the mouth animations and add sound effects from sonic adventure", "make his crouch animation look like this" (reference picture), "the figure 8 running animation looks kinda goofy and really really bugged".
+
+- Forward tilt: the old down tilt (Chaos Emerald thrown out like a boomerang) moves here. From -> to: old forward tilt (28 frames, kick 8-10, 8-9%) -> 32 frames, gem out f6-13 8% (angle 70), gem back f14-25 5% (angle 80).
+- Down tilt: new SA2 Somersault. 26 frames: ball roll f4-10 4% (set KB 22, size 4.0), kick f12-14 5% (angle 85). Old down tilt (34 frames) moved to forward tilt.
+- Forward smash: the gem now flies out and back like a boomerang. From -> to: 44 -> 50 frames, IASA 42 -> 46; gem 18% f15-18 size 3.0 -> 17% f15-24 size 2.8 (BKB 35, KBG 102 -> 100); new return hit f25-38 8%; forearm hit 12% removed. Test v56: 17% at f16 face to face, then 7.3% on the return; 16% at 24 units.
+- Neutral air: early hit size 4.7 -> 5.8 with the SA1-era Insta-Shield crescent (new model part 25, shown f4-10).
+- Neutral B (Homing Attack, `fighter_code/sonic.c`), from -> to: end lag 24 -> 32 frames, hit lag 12 -> 20 frames, landing during the move normal landing (4 frames) -> special landing 14 frames. Test v56: hit 8%; miss ends in LANDING_SPECIAL.
+- Down B (Spin Dash): rev can be held 60 -> 180 frames before it releases by itself. New: jump cancels the move once 120 frames (2 seconds) have passed since down B started (rev + roll); before that, jump does nothing. Test v56: jump at frame 124 -> KNEE_BEND, jump; jump at frame 40 -> no jump, Spin Dash continued (10%).
+- Up B (Super Peel-Out, Sonic CD): rev 6 -> 8 frames, total 22 -> 30 frames. v55 aims at the end of the rev (v54 used the stick at the B press). The figure-8 leg blur was removed from up B and from the run in v56 (user: "goofy and bugged"); legs alternate between two running poses every 2 frames instead.
+- Attributes (`patch_attributes.ps1`), from -> to: InitialDashSpeed 1.9 -> 2.1, InitialRunSpeed 3.1 -> 3.3, StopTurnInitialSpeedA 0.15 -> 0.2, MaxWalkSpeed 1.3 -> 1.45, WalkAcceleration 0.08 -> 0.11, Friction 0.045 -> 0.08 (shorter wavedash, less slippery). Gravity 0.13, air speed 1.2 and air acceleration 0.06 unchanged.
+- Crouch (v56): rebuilt from the user's reference: low on the heels, curled forward, head bowed, right glove over the top of the head (two-bone arm IK `reach()` and `head_point()` in `sonic_anim_lib.py`). Seen in `test_logs/v56_big_crouch_30.png`.
+- Sounds (v56): Sonic's own sound bank `sonic.ssm` (bank index 56, IDs 560000+), 14 sounds taken from the user's Sonic Adventure (Dreamcast) files: homing attack, Light Dash hold/launch/attack, Spin Dash charge/release, swipe, 5 short voice grunts and 2 hurt voices (`scripts/extract_sa1_sounds.py` decodes the MLT/ADPCM banks, `scripts/make_sonic_soundbank.py` picks and resamples, `build_iso.ps1 -SoundBank` adds the bank). Move cues added in `sonic_moves.py` (SFX table); 25 voice IDs in kept Falcon scripts were remapped from Falcon's voice bank to Sonic's grunts/hurt sounds.
+- Tests v56: load test Sonic P1 + Fox P2 OK (150 frames, no crash). Move test (`test_logs/v56_big.out`) results as above.
+
+Not verified: the voice clips were chosen by length only (nobody has listened to them yet); the sounds' volume against Melee's.
+
+## v57: mouth wraps round the muzzle, Peel-Out hitbox covers the whole dash (2026-11-22)
+
+File: `builds/Melee - Sonic v57.iso`. Package `work/sonic_package_v57.zip`, model `work/v19/PlSnNr_v57.dat`.
+
+- Mouth: a close-up renderer (`scripts/face_preview.py`, software render of the model's `_bound.json`) showed that the v49-v56 mouth, cast straight back onto the muzzle front, was only a dot from the side, and the open mouth a red smudge. Melee shows Sonic side-on almost all the time. v57 casts the mouth radially around the muzzle axis, so it wraps round the muzzle from -60 to +60 degrees with the corners turning up 0.5 at the sides (the Adventure-era side smirk). Line half-thickness 0.075 -> 0.06 at the front, 0.11 at the corners. The open mouth is deepest at the front (0.75) and closes toward the corners, with a pink tongue (same part 23, two-colour texture). Preview: `test_logs/v57_face_preview.png` (rows: smile, open, open from 3 angles).
+- Up B (Peel-Out) hitbox, from -> to: active frames 9-22 -> 9-29. In v56 the sideways dash reached a target 60 units away after the hitbox had ended (NO HIT). Damage 6% unchanged.
+- Tests v57: load test Sonic P1 + Fox P2 OK (150 frames, no crash). Move test (`test_logs/v57_big.out`): up B sideways now hits Fox at 60 units on f25 for 6% (v56: no hit); every other move unchanged from v56 (forward smash 17% + 7.3% return, forward tilt 8% + 4.5%, Somersault 4% + 4.5%, homing 8% / miss -> special landing, down B jump cancel at 2 s works and is blocked at f40).
+
+Not verified on v57: the new mouth in game at close range (the in-game test camera is too far out to see it; checked only in the offline render).

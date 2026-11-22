@@ -103,9 +103,28 @@ if "--faceshot" in sys.argv:
         if k < 40: c.tilt_analog(MAIN, .5, 0)
     def taunt(c, k):
         if k < 2: c.press_button(B.BUTTON_D_UP)
-    MOVES = [("fsmash 12", fsmash, 12.0), ("fsmash 15", fsmash, 15.0), ("fsmash 17", fsmash, 17.0), ("homing 40", sp(.5, .5), 40.0), ("homing miss", sp(.5, .5), 82.0),
-             ("spin dash tap", sp(.5, 0, hold=3), 40.0), ("spin dash charged", sp(.5, 0, hold=40), 70.0), ("up b", sp(.5, 1), 20.0)]
-    SHOTS = {"fsmash 17": (16, 18), "up b": (3, 10)}
+    def upb_side(c, k):
+        if k < 2:
+            c.press_button(B.BUTTON_B); c.tilt_analog(MAIN, .5, 1)
+        elif k < 14: c.tilt_analog(MAIN, 1, .5)
+    def downb_jump(c, k):
+        if k < 132:
+            c.press_button(B.BUTTON_B)
+            if k < 3: c.tilt_analog(MAIN, .5, 0)
+        if 124 <= k < 127: c.press_button(B.BUTTON_X)
+    def downb_early(c, k):
+        if k < 60:
+            c.press_button(B.BUTTON_B)
+            if k < 3: c.tilt_analog(MAIN, .5, 0)
+        if 40 <= k < 43: c.press_button(B.BUTTON_X)
+    def runr(c, k):
+        if k < 45: c.tilt_analog(MAIN, 1, .5)
+    def crouch2(c, k):
+        if k < 50: c.tilt_analog(MAIN, .5, 0)
+    MOVES = [("crouch", crouch2, 14.0, 60), ("fsmash face", fsmash, 9.0, 60), ("ftilt 16", ftilt, 16.0), ("dtilt 8", dtilt, 8.0), ("dtilt 12", dtilt, 12.0),
+             ("fsmash 24", fsmash, 24.0), ("homing 40", sp(.5, .5), 40.0), ("homing miss", sp(.5, .5), 82.0),
+             ("down b jump", downb_jump, 60.0, 190), ("down b early jump", downb_early, 60.0), ("up b", sp(.5, 1), 20.0), ("up b side", upb_side, 60.0)]
+    SHOTS = {"crouch": (30,), "fsmash face": (16,), "dtilt 12": (15, 20), "up b": (5, 14), "up b side": (14,)}
 if "--spinshots" in sys.argv:
     MOVES = [("spin dash charged", sp(1, .5, hold=40), 60.0), ("nair", air(None, None), 20.0), ("homing 40", sp(.5, .5), 40.0)]
     SHOTS = {"spin dash charged": (4, 14, 30, 46, 52, 90), "nair": (5, 12, 18, 40), "homing 40": (6, 30)}
@@ -136,7 +155,8 @@ def main():
             a, b = gs.players[1], gs.players[2]
             act = a.action.name if hasattr(a.action, "name") else str(a.action)
             bact = b.action.name if hasattr(b.action, "name") else str(b.action)
-            name, fn, dist = MOVES[mi]
+            name, fn, dist = MOVES[mi][:3]
+            dur = MOVES[mi][3] if len(MOVES[mi]) > 3 else 110
             dx = float(b.position.x - a.position.x)
             rows.append([frames, name, phase, k, act, a.action_frame, round(float(a.position.x), 2), round(dx, 2), b.percent, bact])
             c.release_all()
@@ -186,7 +206,7 @@ def main():
                 if "GRAB" in bact.upper() or "CAPTURE" in bact.upper() or bact.startswith("GRABBED"):
                     cur["grabbed"] = cur.get("grabbed") or (act, a.action_frame, bact)
                 k += 1
-                if k >= 110:
+                if k >= dur:
                     results.append(cur)
                     phase, k = "reset", 0
                     mi += 1

@@ -1,7 +1,7 @@
 # Builds a new versioned ISO: clean Melee copy + m-ex + the Sonic fighter package.
 # Usage: powershell -File build_iso.ps1 -Version v01 -Package C:\adventure-melee\work\sonic_package_v01.zip
 # Never overwrites an existing build and never touches base\Melee NTSC 1.02 clean.iso.
-param([Parameter(Mandatory)][string]$Version, [string]$Package, [switch]$NoFighter, [switch]$NoIcon)
+param([Parameter(Mandatory)][string]$Version, [string]$Package, [switch]$NoFighter, [switch]$NoIcon, [string]$SoundBank)
 . C:\adventure-melee\scripts\mex_common.ps1
 $out = "C:\adventure-melee\builds\Melee - Sonic $Version.iso"
 if (Test-Path $out) { throw "Build already exists, refusing to overwrite: $out" }
@@ -37,6 +37,44 @@ try {
         "Kirby hat entries copied to Sonic: $($dstK.Count)"
     }
     $i = 0; foreach ($x in $fighters) { if ($i -ge 24) { "  {0,2} {1}" -f $i, $x.NameText }; $i++ }
+
+    if ($SoundBank) {
+        # Sonic's own sound bank, built from a manifest of WAV files (index order = sound ID - 560000). A new bank, so Falcon's
+        # captain.ssm is left as it is. Script settings are copied from Falcon's bank.
+        $man = Get-Content $SoundBank -Raw | ConvertFrom-Json
+        $banks = Mex-Field 'SoundBanks'
+        $cap = $banks | Where-Object { $_.SoundBank.Name -eq 'captain.ssm' } | Select-Object -First 1
+        $mm = [AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.GetName().Name -eq 'MeleeMedia' } | Select-Object -First 1
+        $ssm = [Activator]::CreateInstance($mm.GetType('MeleeMedia.Audio.SSM'))
+        $ssm.Name = 'sonic.ssm'
+        $scripts = New-Object System.Collections.ArrayList
+        $codeT = $mm.GetType('MeleeMedia.Audio.SEMCode'); $enumT = $mm.GetType('MeleeMedia.Audio.SEM_CODE')
+        foreach ($e in $man) {
+            $dsp = [Activator]::CreateInstance($mm.GetType('MeleeMedia.Audio.DSP'))
+            $dsp.FromFormat([IO.File]::ReadAllBytes($e.wav), 'wav')
+            $ssm.AddSound($dsp)
+            $sc = [Activator]::CreateInstance($mm.GetType('MeleeMedia.Audio.SEMBankScript'))
+            $sc.Name = 'SONIC_' + $e.name.ToUpper()
+            foreach ($cv in @(@('SET_SFXID', [int]$e.index), @('SET_REVERB1', 1), @('SET_PRIORITY', 15), @('PLAY', 200), @('END_PLAYBACK', 0))) {
+                $c = [Activator]::CreateInstance($codeT, [object[]]@([Enum]::Parse($enumT, $cv[0])))
+                $c.Value = $cv[1]
+                $sc.Codes.Add($c)
+            }
+            [void]$scripts.Add($sc)
+        }
+        $sem = [Activator]::CreateInstance($mm.GetType('MeleeMedia.Audio.SEMBank'))
+        $arr = [Array]::CreateInstance($mm.GetType('MeleeMedia.Audio.SEMBankScript'), $scripts.Count)
+        for ($k = 0; $k -lt $scripts.Count; $k++) { $arr[$k] = $scripts[$k] }
+        $sem.Scripts = $arr
+        $bankT = $MexAsm.GetType('mexTool.Core.MEXSoundBank')
+        $nb = [Activator]::CreateInstance($bankT, [object[]]@($sem, $ssm))
+        $nb.Group = $cap.Group; $nb.Flags = $cap.Flags; $nb.GroupFlags = $cap.GroupFlags
+        $banks.Add($nb)
+        $sonic.SoundBank = $nb
+        $bi = $banks.IndexOf($nb)
+        "Sonic sound bank: sonic.ssm, $($man.Count) sounds, bank index $bi (script IDs ${bi}0000+)"
+        if ($bi -ne 56) { throw "sound bank index is $bi, but Sonic's scripts were built for 56" }
+    }
 
     if (-not $NoIcon) {
     # Character-select icon: clone Captain Falcon's icon and place it in the gap right of Roy.

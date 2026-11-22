@@ -308,9 +308,17 @@ for k_, cs in groups.items():
 skin = np.array(skin)
 
 
-def onface(x, y, lift=0.13):
-    """front-most skin point at (x, y) seen from the front, pushed out along the surface normal."""
-    o, d = np.array([x, y, 8.0]), np.array([0.0, 0.0, -1.0])
+ZC, TM = -0.3, math.radians(60)         # v57: muzzle axis (x=0, z=ZC); the mouth wraps from -TM to +TM around it
+MY, MUP = 11.55, 0.5                    # centre height, how far the corners turn up at the sides
+HW0, HW1, OPEN = 0.06, 0.11, 0.75       # line half thickness at the front and at the corners; open-mouth depth
+
+
+def onface(theta, y, lift=0.13):
+    """outer skin point at height y, angle theta around the muzzle axis (0 = straight ahead), pushed out along the
+    surface normal. v57: rays come in radially, so the mouth wraps round the side of the muzzle where Melee's side-on
+    camera sees it (v49-v56 cast straight back, so from the side the mouth was a dot)."""
+    d = np.array([-math.sin(theta), 0.0, -math.cos(theta)])
+    o = np.array([0.0, y, ZC]) - 6.0 * d
     best = None
     for t in skin:
         e1, e2 = t[1] - t[0], t[2] - t[0]
@@ -326,36 +334,41 @@ def onface(x, y, lift=0.13):
         tt = (e2 @ qv) / det
         if tt > 0 and (best is None or tt < best[0]):
             nn = np.cross(e1, e2); nn = nn / np.linalg.norm(nn)
-            best = (tt, nn if nn[2] > 0 else -nn)
+            best = (tt, nn if nn @ d < 0 else -nn)
     if best is None:
-        raise SystemExit(f"mouth point ({x:.2f}, {y:.2f}) misses the muzzle")
+        raise SystemExit(f"mouth point ({math.degrees(theta):.0f} deg, {y:.2f}) misses the muzzle")
     return o + best[0] * d + lift * best[1], best[1]
 
 
-MW, MY, MUP = 0.95, 11.6, 0.24          # half width, centre height of the smile line, how far the corners turn up
-smile_y = lambda x: MY + MUP * (x / MW) ** 2   # noqa: E731
+_s = lambda q: q / TM                                       # noqa: E731
+smile_y = lambda q: MY + MUP * _s(q) ** 2                   # noqa: E731
+_hw = lambda q: HW0 + (HW1 - HW0) * _s(q) ** 2              # noqa: E731
+_depth = lambda q: OPEN * math.cos(0.5 * math.pi * _s(q)) ** 1.3   # noqa: E731
 
 
-def band(top, bot, cols=12, rows=1, lift=0.13):
+def band(top, bot, lo=-TM, hi=TM, cols=24, rows=1, lift=0.13):
     out = []
     for i in range(cols):
         for r in range(rows):
             pts = []
-            for (xi, rf) in ((i, r), (i, r + 1), (i + 1, r + 1), (i + 1, r)):
-                x = -MW + 2 * MW * xi / cols
-                y = top(x) + (bot(x) - top(x)) * rf / rows
-                pw, nw = onface(x, y, lift)
+            for (qi, rf) in ((i, r), (i, r + 1), (i + 1, r + 1), (i + 1, r)):
+                q = lo + (hi - lo) * qi / cols
+                y = top(q) + (bot(q) - top(q)) * rf / rows
+                pw, nw = onface(q, y, lift)
                 pts.append(((Whi @ np.append(pw, 1.0))[:3], Wh[:3, :3].T @ nw))
             for a_, b_, c_ in ((0, 1, 2), (0, 2, 3)):
                 out += [(pts[k][0], pts[k][1], (0.5, 0.5), HEADB) for k in (a_, b_, c_)]
     return out
 
 
-mcorn = band(lambda x: smile_y(x) + 0.075, lambda x: smile_y(x) - 0.075)
+mcorn = band(lambda q: smile_y(q) + _hw(q), lambda q: smile_y(q) - _hw(q))
 make_dobj(mcorn, flat((25, 20, 45)))
-print(f"  dobj {dobj_count - 1:2}: mouth (smile), {len(mcorn) // 3} triangles, at height {MY} under the nose")
-# open mouth: a D shape below the smile line, dark red inside, made now and added after the trail (part 23)
-ocorn = band(lambda x: smile_y(x) + 0.08, lambda x: smile_y(x) - 0.08 - 0.5 * (1 - (x / MW) ** 2), rows=3, lift=0.19)   # in front of the smile, which it covers
+print(f"  dobj {dobj_count - 1:2}: mouth (smile), {len(mcorn) // 3} triangles, wraps +-{math.degrees(TM):.0f} deg round the muzzle")
+# open mouth (part 23): dark red, deepest at the front and closing toward the corners, with a tongue; it sits in front
+# of the smile, which still shows at the corners
+ocorn = band(lambda q: smile_y(q) + _hw(q), lambda q: smile_y(q) - _hw(q) - _depth(q), -0.75 * TM, 0.75 * TM, cols=18, rows=3, lift=0.19)
+tcorn = band(lambda q: smile_y(q) - _hw(q) - 0.55 * _depth(q), lambda q: smile_y(q) - _hw(q) - 0.95 * _depth(q),
+             -0.4 * TM, 0.4 * TM, cols=10, rows=2, lift=0.21)
 
 # ---- 19: spin ball (SA1 spin sprite, upscaled)
 BALL_R, BALL_C = 4.5, np.array([0.0, 2.0, 1.2])
@@ -427,8 +440,55 @@ for k in range(TSEG):
         tc += [(q, n_, (u_, 0.5), 62) for q, u_ in zip(pts, us)]
 make_dobj(tc, tg)
 print(f"  dobj {dobj_count - 1:2}: light-speed trail, {len(tc) // 3} triangles")
-make_dobj(ocorn, flat((40, 30, 120)))
-print(f"  dobj {dobj_count - 1:2}: mouth (open), {len(ocorn) // 3} triangles")
+mtex = np.zeros((8, 8, 4), dtype=np.uint8)
+mtex[:, :4] = (40, 30, 120, 255)                    # BGRA: dark red inside
+mtex[:, 4:] = (95, 85, 205, 255)                    # pink tongue
+ocorn = [(p_, n_, (0.2, 0.5), b_) for p_, n_, _, b_ in ocorn] + [(p_, n_, (0.8, 0.5), b_) for p_, n_, _, b_ in tcorn]
+make_dobj(ocorn, mtex)
+print(f"  dobj {dobj_count - 1:2}: mouth (open, with tongue), {len(ocorn) // 3} triangles")
+
+# ---- 24: Super Peel-Out figure-8 (Sonic CD): the red-and-white infinity loop his legs blur into. Two flat ribbons, one over
+# each leg, on the prop bone 62. Centred 1.7 above the bone, so with the bone at rest (the fighter's base point) it sits at shoe height.
+f8 = np.zeros((8, 32, 4), dtype=np.uint8)
+for xx_ in range(32):
+    f8[:, xx_] = (255, 255, 255, 255) if (xx_ // 4) % 2 == 1 else (45, 45, 235, 255)      # B, G, R: white / shoe red
+FA, FW, FN, FY = 3.6, 0.85, 40, 1.7
+def lem(t):   # noqa: E302  lemniscate in the Y/Z plane (what the side-on camera sees)
+    d_ = 1 + math.sin(t) ** 2
+    return np.array([0.0, FY + FA * math.sin(t) * math.cos(t) / d_, FA * math.cos(t) / d_])
+fcorn = []
+for xoff in (-0.85, 0.85):
+    for k in range(FN):
+        t0, t1 = 2 * math.pi * k / FN, 2 * math.pi * (k + 1) / FN
+        quad = []
+        for t_ in (t0, t1):
+            p_ = lem(t_)
+            tan = lem(t_ + 0.01) - lem(t_ - 0.01); tan = tan / (np.linalg.norm(tan) + 1e-9)
+            nrm = np.array([0.0, -tan[2], tan[1]])
+            quad.append((p_ + nrm * FW / 2 + [xoff, 0, 0], p_ - nrm * FW / 2 + [xoff, 0, 0]))
+        (a0, b0), (a1, b1) = quad
+        u0, u1 = k / FN, (k + 1) / FN
+        side_n = np.array([1.0 if xoff > 0 else -1.0, 0.0, 0.0])
+        fcorn += [(a0, side_n, (u0, 0.5), 62), (b0, side_n, (u0, 0.5), 62), (b1, side_n, (u1, 0.5), 62),
+                  (a0, side_n, (u0, 0.5), 62), (b1, side_n, (u1, 0.5), 62), (a1, side_n, (u1, 0.5), 62)]
+make_dobj(fcorn, f8, amb=255)
+print(f"  dobj {dobj_count - 1:2}: Peel-Out figure-8, {len(fcorn) // 3} triangles")
+
+# ---- 25: Insta-Shield (Sonic 3): a white crescent that flashes round the spinning ball. On bone 2 with the ball, so it
+# whirls with the spin. A 220-degree arc of radius about 6.4, thickest in the middle.
+icorn = []
+IN, IMAX = 26, math.radians(110)
+def ipt(th, r):   # noqa: E302
+    return BALL_C + np.array([0.0, r * math.cos(th), r * math.sin(th)])
+for k in range(IN):
+    th0, th1 = -IMAX + 2 * IMAX * k / IN, -IMAX + 2 * IMAX * (k + 1) / IN
+    w0, w1 = 0.06 + 0.6 * (1 - (th0 / IMAX) ** 2), 0.06 + 0.6 * (1 - (th1 / IMAX) ** 2)
+    q = [ipt(th0, 6.4 + w0), ipt(th0, 6.4 - w0), ipt(th1, 6.4 - w1), ipt(th1, 6.4 + w1)]
+    nx = np.array([1.0, 0.0, 0.0])
+    icorn += [(q[0], nx, (0.5, 0.5), 2), (q[1], nx, (0.5, 0.5), 2), (q[2], nx, (0.5, 0.5), 2),
+              (q[0], nx, (0.5, 0.5), 2), (q[2], nx, (0.5, 0.5), 2), (q[3], nx, (0.5, 0.5), 2)]
+make_dobj(icorn, flat((255, 255, 225)), amb=255)
+print(f"  dobj {dobj_count - 1:2}: Insta-Shield, {len(icorn) // 3} triangles")
 
 gen.SaveChanges()
 # v32: draw both sides of every polygon. The generator's CULLFRONT flag with these windings made the game draw only
