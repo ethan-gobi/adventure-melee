@@ -308,9 +308,9 @@ for k_, cs in groups.items():
 skin = np.array(skin)
 
 
-ZC, TM = -0.3, math.radians(60)         # v57: muzzle axis (x=0, z=ZC); the mouth wraps from -TM to +TM around it
-MY, MUP = 11.55, 0.5                    # centre height, how far the corners turn up at the sides
-HW0, HW1, OPEN = 0.06, 0.11, 0.75       # line half thickness at the front and at the corners; open-mouth depth
+ZC, TM = -0.3, math.radians(30)         # v57: muzzle axis (x=0, z=ZC); the mouth wraps from -TM to +TM around it
+MY, MUP = 11.6, 0.22                    # v61 (user: "mouth way too big"): wrap 60 -> 30 deg, corners 0.5 -> 0.22, centre height, how far the corners turn up at the sides
+HW0, HW1, OPEN = 0.045, 0.06, 0.32     # v61: 0.06/0.11/0.75 -> 0.045/0.06/0.32; line half thickness at the front and at the corners; open-mouth depth
 
 
 def onface(theta, y, lift=0.13):

@@ -104,7 +104,8 @@ for s_, (a, f, h) in ARMS.items():
     RD["fore" + s_] = unit(rest_W[h][:3, 3] - rest_W[f][:3, 3])
 
 VEC_KEYS = list(RD.keys())
-DEFAULT = {"root": (0, 0, 0), "chest": (0, 0, 0), "head": (0, 0, 0), "hip": (0, 0, 0), "pivot": (0, 0, 0), "ground": 1.0, "move": 0.0,
+DEFAULT = {"root": (0, 0, 0), "chest": (0, 0, 0), "head": (0, 0, 0), "hip": (0, 0, 0), "pivot": (0, 0, 0), "ground": 1.0, "move": 0.0, "fy": 1.0,
+           "floor": 0.0, "up": 0.0,   # v61: floor = rest the lowest point of the whole body on the floor (lying poses); up = extra height after that
            "footL": 0.0, "footR": 0.0,
            "thighL": (0.10, -1, 0.22), "shinL": (0.06, -1, -0.22), "thighR": (-0.10, -1, -0.05), "shinR": (-0.06, -1, -0.30),
            "armL": (0.45, -1, -0.10), "foreL": (0.30, -1, 0.45), "armR": (-0.45, -1, -0.15), "foreR": (-0.30, -1, 0.40)}
@@ -159,6 +160,31 @@ def sample(keys, T):
     return out
 
 
+_HULL = None
+
+
+def lowest(W):
+    """height of the lowest point of the model (every rigid part, not only the feet) for a set of world matrices"""
+    global _HULL
+    if _HULL is None:
+        pts = {}
+        for g in bd["groups"]:
+            for c in g["c"]:
+                pts.setdefault(c[0], set()).add((round(c[1], 3), round(c[2], 3), round(c[3], 3)))
+        dirs = []
+        for i in range(48):                         # keep only the points furthest out in 48 directions (enough for a floor test)
+            y = 1 - 2 * (i + 0.5) / 48
+            r = math.sqrt(1 - y * y)
+            dirs.append((r * math.cos(i * 2.399963), y, r * math.sin(i * 2.399963)))
+        dirs = np.array(dirs)
+        _HULL = {}
+        for b_, ps in pts.items():
+            a_ = np.array(sorted(ps))
+            a_ = a_[sorted(set(np.argmax(a_ @ dirs.T, axis=0)))]
+            _HULL[b_] = np.hstack([a_, np.ones((len(a_), 1))])
+    return min(float(np.min(h @ W[b_][1])) for b_, h in _HULL.items())
+
+
 def solve(p):
     """pose -> (world matrices, {bone: (tx,ty,tz,rx,ry,rz)})"""
     Rr = eul(p["root"])
@@ -199,7 +225,11 @@ def solve(p):
     g = float(p["ground"])
     if g > 0:
         low = min(W[b][1, 3] - rest_W[b][1, 3] for b in (10, 11, 16, 17))
-        W, vals = run(hip + np.array([0.0, -low * g, 0.0]))
+        hip = hip + np.array([0.0, -low * g, 0.0])
+        W, vals = run(hip)
+    fl, up = float(p.get("floor", 0.0)), float(p.get("up", 0.0))
+    if fl > 0 or up != 0:
+        W, vals = run(hip + np.array([0.0, (-lowest(W) * fl if fl > 0 else 0.0) + up, 0.0]))
     return W, vals
 
 
@@ -219,11 +249,17 @@ TT = [JointTrackType.HSD_A_J_TRAX, JointTrackType.HSD_A_J_TRAY, JointTrackType.H
 
 
 class Anim:
-    def __init__(self, actions, T, keys, keep_root=False, keep=(), shield_y=None, prop=None):
+    def __init__(self, actions, T, keys, keep_root=False, keep=(), shield_y=None, prop=None, hip_from=None):
         self.actions = [actions] if isinstance(actions, str) else list(actions)
         self.T, self.keys, self.keep_root = T, sorted(keys, key=lambda k: k[0]), keep_root
         self.keep = tuple(keep) + ((1,) if keep_root else ())      # bones whose original tracks stay (same frame count needed)
         self.poses = sample(self.keys, T)
+        if hip_from:                    # v60: follow the original animation's body path (bone 3 offset, which smooths the
+            off = falcon_track(hip_from, 3, T)[:, :3] - rest[3][:3]   # stepped root motion of bone 1), added to the hip;
+            for f_, p_ in enumerate(self.poses):                        # "fy" scales the vertical part (0 for a ball on the floor)
+                o_ = off[f_].copy()
+                o_[1] *= float(p_["fy"])
+                p_["hip"] = np.array(p_["hip"], dtype=float) + o_
         self.solved = [solve(p) for p in self.poses]
         if prop is not None:            # bone 62 (child of the root, otherwise unused in these moves) carries the Chaos Emerald
             for f_, (W, vals) in enumerate(self.solved):
@@ -231,8 +267,10 @@ class Anim:
                 pos, yaw, pitch = r_[0], r_[1], (r_[2] if len(r_) > 2 else 0.0)
                 vals[62] = (float(pos[0]), float(pos[1]), float(pos[2]), math.radians(pitch), math.radians(yaw), 0.0)
         if shield_y is not None:        # put the shield bubble bone (61) at a fixed height above the floor
-            for W, vals in self.solved:
-                local = np.linalg.inv(W[parent[61]]) @ np.array([W[2][0, 3], shield_y, W[2][2, 3] + 0.3, 1.0])
+            for (W, vals), p_ in zip(self.solved, self.poses):   # v61: centred on the pose's pivot (the ball centre) when it has one
+                pv = np.array(p_["pivot"], dtype=float)
+                c_ = W[2][:3, 3] + (eul(p_["root"]) @ pv if np.any(pv) else np.array([0.0, 0.0, 0.3]))
+                local = np.linalg.inv(W[parent[61]]) @ np.array([c_[0], shield_y, c_[2], 1.0])
                 vals[61] = (*local[:3], *rest[61][3:6])
 
 
@@ -270,7 +308,9 @@ def write_anims(anims, aj_in, pl_in, aj_out, pl_out):
                     if max(series) - min(series) < 1e-5 and abs(series[0] - rest[bi][ci]) < 1e-5:
                         continue
                     keys = List[FOBJKey]()
-                    for k, val in enumerate(series):
+                    tol = 0.0025 if ci >= 3 else 0.004              # 0.14 degrees / 0.004 units
+                    for k in thin(series, tol):
+                        val = series[k]
                         key = FOBJKey()
                         key.Frame = float(k)
                         key.Value = float(val)
@@ -300,6 +340,40 @@ def write_anims(anims, aj_in, pl_in, aj_out, pl_out):
     print(f"animations written: {sum(len(a.actions) for a in anims)}; AJ {os.path.getsize(aj_in)} -> {len(new_aj)} bytes; re-read errors {bad}")
     if bad:
         raise SystemExit("offset patch failed")
+
+
+def write_shield_pose(pl_path, vals):
+    """v62b: overwrite the guard pose stored inside the fighter file, in place.
+
+    While a shield is held (states Guard / GuardReflect) the game does not use the Guard animations: it copies the joint
+    values of a pose skeleton kept in the fighter data (ftData + 0x20 -> container -> JOBJ tree, same joint order as the
+    model). Sonic's file still had Captain Falcon's pose there with Falcon's full-size bone offsets (hips 13.85 high,
+    shins 4.68 long), which pulled Sonic's rigid parts apart inside the bubble. `vals` = {bone: (tx, ty, tz, rx, ry, rz)}
+    from the pose solver; every other joint gets Sonic's rest values. Returns the number of joints written."""
+    raw = bytearray(open(pl_path, "rb").read())
+    data_size, n_reloc, n_root = struct.unpack(">III", raw[4:16])
+    root_off = struct.unpack(">I", raw[0x20 + data_size + n_reloc * 4: 0x20 + data_size + n_reloc * 4 + 4])[0]
+    ptr = lambda o: struct.unpack(">I", raw[0x20 + o: 0x24 + o])[0]      # noqa: E731
+    cont = ptr(root_off + 0x20)
+    order = []
+
+    def walk(j):
+        while j:
+            order.append(j)
+            c = ptr(j + 0x08)
+            if c:
+                walk(c)
+            j = ptr(j + 0x0C)
+    walk(ptr(cont))
+    if len(order) != NB:
+        raise SystemExit(f"shield pose has {len(order)} joints, skeleton has {NB}")
+    for i, j in enumerate(order):
+        v = vals.get(i, tuple(rest[i][:6]))
+        raw[0x20 + j + 0x14: 0x20 + j + 0x20] = struct.pack(">3f", *[float(x) for x in v[3:6]])
+        raw[0x20 + j + 0x20: 0x20 + j + 0x2C] = struct.pack(">3f", *[float(x) for x in rest[i][6:9]])
+        raw[0x20 + j + 0x2C: 0x20 + j + 0x38] = struct.pack(">3f", *[float(x) for x in v[0:3]])
+    open(pl_path, "wb").write(raw)
+    return len(order)
 
 
 def action_table(raw, pl_path):
@@ -507,6 +581,129 @@ def orig_bone_pos(aj_path, action, frame, bones):
                     v[CH[nm]] = FOBJ_Player(t.ToFOBJ()).GetValue(float(frame))
         W.append(mat(v) if parent[i] < 0 else W[parent[i]] @ mat(v))
     return [W[b][:3, 3].copy() for b in bones]
+
+
+_AJ_CACHE = {}
+
+
+def falcon_track(action, bone, T, aj_path="C:/adventure-melee/work/v10/PlSnAJ_v10r.dat"):
+    """(T+1, 6) translation + rotation of one bone, every frame, in the original (Falcon, Sonic-scaled) animation."""
+    from HSDRaw.Tools import FOBJ_Player
+    if aj_path not in _AJ_CACHE:
+        _AJ_CACHE[aj_path] = FighterAJManager(File.ReadAllBytes(aj_path))
+    aj = _AJ_CACHE[aj_path]
+    sym = [s_ for s_ in aj.GetAnimationSymbols() if s_.endswith(f"ACTION_{action}_figatree")][0]
+    ft = HSDRawFile(aj.GetAnimationData(sym)).Roots[0].Data
+    CH = {"HSD_A_J_TRAX": 0, "HSD_A_J_TRAY": 1, "HSD_A_J_TRAZ": 2, "HSD_A_J_ROTX": 3, "HSD_A_J_ROTY": 4, "HSD_A_J_ROTZ": 5}
+    out = np.tile(rest[bone][:6], (T + 1, 1)).astype(float)
+    if bone < ft.Nodes.Count:
+        for t in ft.Nodes[bone].Tracks:
+            nm = str(t.JointTrackType)
+            if nm in CH:
+                pl = FOBJ_Player(t.ToFOBJ())
+                for f_ in range(T + 1):
+                    out[f_, CH[nm]] = pl.GetValue(float(f_))
+    return out
+
+
+def _rot(m):
+    """nearest pure rotation to a 3x3 (drops scale/shear)"""
+    u, _, vt = np.linalg.svd(m)
+    r = u @ vt
+    if np.linalg.det(r) < 0:
+        u[:, -1] *= -1
+        r = u @ vt
+    return r
+
+
+def _euler_yxz(M):
+    """(pitch, yaw, roll) in degrees with M = Ry(yaw) @ Rx(pitch) @ Rz(roll), the order eul() uses"""
+    return (math.degrees(math.asin(max(-1.0, min(1.0, -M[1, 2])))), math.degrees(math.atan2(M[0, 2], M[2, 2])),
+            math.degrees(math.atan2(M[1, 0], M[1, 1])))
+
+
+def falcon_frames(action, aj_path="C:/adventure-melee/work/v10/PlSnAJ_v10r.dat"):
+    """world matrices of every bone on every frame of an original (Falcon, Sonic-scaled) animation"""
+    from HSDRaw.Tools import FOBJ_Player
+    if aj_path not in _AJ_CACHE:
+        _AJ_CACHE[aj_path] = FighterAJManager(File.ReadAllBytes(aj_path))
+    aj = _AJ_CACHE[aj_path]
+    sym = [s_ for s_ in aj.GetAnimationSymbols() if s_.endswith(f"ACTION_{action}_figatree")][0]
+    ft = HSDRawFile(aj.GetAnimationData(sym)).Roots[0].Data
+    CH = {"HSD_A_J_TRAX": 0, "HSD_A_J_TRAY": 1, "HSD_A_J_TRAZ": 2, "HSD_A_J_ROTX": 3, "HSD_A_J_ROTY": 4, "HSD_A_J_ROTZ": 5}
+    T = int(ft.FrameCount)                      # an animation of FrameCount n is written here as T = n (n + 1 poses)
+    players = [(i, CH[str(t.JointTrackType)], FOBJ_Player(t.ToFOBJ())) for i in range(min(NB, ft.Nodes.Count))
+               for t in ft.Nodes[i].Tracks if str(t.JointTrackType) in CH]
+    out = []
+    for f_ in range(T + 1):
+        vals = [v.copy() for v in rest]
+        for i, c, pl in players:
+            vals[i][c] = pl.GetValue(float(f_))
+        W = []
+        for i, v in enumerate(vals):
+            W.append(mat(v) if parent[i] < 0 else W[parent[i]] @ mat(v))
+        out.append(W)
+    return out
+
+
+def falcon_len(action, aj_path="C:/adventure-melee/work/v10/PlSnAJ_v10r.dat"):
+    """frame count of an original animation (the T to give Anim so the move keeps its length)"""
+    if aj_path not in _AJ_CACHE:
+        _AJ_CACHE[aj_path] = FighterAJManager(File.ReadAllBytes(aj_path))
+    aj = _AJ_CACHE[aj_path]
+    sym = [s_ for s_ in aj.GetAnimationSymbols() if s_.endswith(f"ACTION_{action}_figatree")][0]
+    return int(HSDRawFile(aj.GetAnimationData(sym)).Roots[0].Data.FrameCount)
+
+
+def retarget(action, ground=1.0, base=None):
+    """v61: re-pose an original animation on Sonic's body instead of copying Falcon's joint values. Every frame takes the
+    world directions of Falcon's limbs and the turn of his hips, chest and head, and solves them with Sonic's own pose
+    solver, so the feet are planted on the floor (ground=1) instead of sinking and the body is not squashed. With ground=0
+    (in the air) the hips stay where Sonic's fall pose has them. Returns one key per frame."""
+    keys = []
+    prev = None
+    for f_, W in enumerate(falcon_frames(action)):
+        D = {b: _rot(W[b][:3, :3] @ np.linalg.inv(rest_W[b][:3, :3])) for b in (2, 19, 39)}
+        root = np.array(_euler_yxz(D[2]))
+        if prev is not None:                       # keep the angles continuous from frame to frame
+            root = prev + (root - prev + 180.0) % 360.0 - 180.0
+        prev = root
+        Rr = eul(root)
+        Dc = D[19]
+        p = dict(DEFAULT if base is None else base)
+        p.update(root=tuple(root), chest=_euler_yxz(Rr.T @ Dc), head=_euler_yxz(Dc.T @ D[39]), ground=ground)
+        for s_, (th, sh, ft_) in LEGS.items():
+            p["thigh" + s_] = tuple(Rr.T @ unit(W[sh][:3, 3] - W[th][:3, 3]))
+            p["shin" + s_] = tuple(Rr.T @ unit(W[sh + 1][:3, 3] - W[sh][:3, 3]))
+            if ground > 0:                         # keep the sole level whatever the shin does
+                m = Rr @ arc(RD["shin" + s_], p["shin" + s_])
+                p["foot" + s_] = max(-60.0, min(60.0, math.degrees(math.atan2(m[1, 2], m[1, 1]))))
+        for s_, (a_, fo, h_) in ARMS.items():
+            p["arm" + s_] = tuple(Dc.T @ unit(W[fo][:3, 3] - W[a_][:3, 3]))
+            p["fore" + s_] = tuple(Dc.T @ unit(W[h_][:3, 3] - W[fo][:3, 3]))
+        keys.append((f_, p, "lin"))
+    return keys
+
+
+def thin(series, tol):
+    """indices of the keys to keep so straight lines between them stay within tol of every frame (v60, smaller files)."""
+    n = len(series)
+    keep = {0, n - 1}
+    stack = [(0, n - 1)]
+    while stack:
+        a, b = stack.pop()
+        if b - a < 2:
+            continue
+        va, vb = series[a], series[b]
+        worst, wi = -1.0, -1
+        for i in range(a + 1, b):
+            d = abs(series[i] - (va + (vb - va) * (i - a) / (b - a)))
+            if d > worst:
+                worst, wi = d, i
+        if worst > tol:
+            keep.add(wi)
+            stack += [(a, wi), (wi, b)]
+    return sorted(keep)
 
 
 def reach(pose, side, target, pole=(0.0, 0.0, 0.0)):

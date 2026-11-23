@@ -26,9 +26,12 @@
 #define HOMING_FRAMES 24
 #define AIRDASH_SPEED 2.8f
 #define AIRDASH_FRAMES 12
-#define HOMING_ENDLAG 32 // extra frames after the dash where Sonic just falls and cannot act (v52: 14 -> 24, v54: -> 32)
-#define HOMING_HITLAG 20 // frames after a hit, popping up and back, before he can act (v52: 0 -> 12, v54: -> 20)
-#define HOMING_LANDLAG 14.0f // landing lag if he touches the floor during the move (v54; was a normal 4-frame landing)
+#define HOMING_ENDLAG 60 // extra frames after the dash where Sonic just falls and cannot act (v52: 14 -> 24, v54: -> 32, v58: -> 44, v61: -> 60;
+                         // before v58 the 40-frame animation ended the move early, so only about 16 frames ever played)
+#define HOMING_HITLAG 34 // frames after a hit, popping up and back, before he can act (v52: 0 -> 12, v54: -> 20, v58: -> 26, v61: -> 34)
+#define HOMING_LANDLAG 28.0f // landing lag if he touches the floor during the move (v54: 4 -> 14, v58: -> 20, v61: -> 28)
+#define HOMING_HIT_LANDLAG 20.0f // landing lag if he touches the floor during the pop-up after a hit (v58-v60 value, kept in v61)
+#define HOMING_LANDLAG_MAX 48.0f // v59: a missed Homing Attack that lands takes its remaining end lag as landing lag, up to this (v61: 36 -> 48)
 #define BOUNCE_ENDLAG 18 // frames after the rebound before Sonic can act
 #define ROLL_BASE 3.0f
 #define ROLL_BONUS 1.6f
@@ -192,7 +195,19 @@ void Air_Coll(GOBJ *fighter)
 
 void Homing_Land(GOBJ *fighter)
 {
-    Fighter_EnterSpecialLanding(fighter, 0, HOMING_LANDLAG);
+    FighterData *fd = fighter->userdata;
+    float lag = HOMING_HIT_LANDLAG;
+    if (fd->state_var.state_var4 == 0)
+    { // v59: a miss that lands spends the rest of its end lag as landing lag (v54-v58 it skipped the end lag entirely)
+        int limit = (fd->state_var.state_var2 ? HOMING_FRAMES : AIRDASH_FRAMES) + HOMING_ENDLAG;
+        float left = (float)(limit - fd->state_var.state_var1);
+        lag = HOMING_LANDLAG;
+        if (left > lag)
+            lag = left;
+        if (lag > HOMING_LANDLAG_MAX)
+            lag = HOMING_LANDLAG_MAX;
+    }
+    Fighter_EnterSpecialLanding(fighter, 0, lag);
 }
 
 void Homing_Coll(GOBJ *fighter)
@@ -486,6 +501,26 @@ void Bounce_Land(GOBJ *fighter)
 void Bounce_Coll(GOBJ *fighter)
 {
     Fighter_CollAir_IgnoreLedge(fighter, Bounce_Land);
+}
+
+// ---------------------------------------------------------------- shield: curled into the spin ball (v61)
+// The game does not play the guard animations (it holds one pose) and ignores model changes in their scripts, so the ball
+// model (visibility group 0, set 1) is switched here once a frame. 178 GuardOn, 179 Guard, 181 GuardSetOff (shield stun),
+// 182 GuardReflect; 180 GuardOff shows the body again as he uncurls.
+void OnFrame(GOBJ *fighter)
+{
+    FighterData *fd = fighter->userdata;
+    int s = fd->state_id;
+    if (s == 178 || s == 179 || s == 181 || s == 182)
+    {
+        Fighter_SetVisGroupCurrent(fighter, 0, 1);
+        fd->fighter_var.ft_var1 = 1;
+    }
+    else if (fd->fighter_var.ft_var1)
+    { // first frame out of the shield (shield drop, jump, roll, grab, hit): body back
+        fd->fighter_var.ft_var1 = 0;
+        Fighter_SetVisGroupCurrent(fighter, 0, 0);
+    }
 }
 
 // ---------------------------------------------------------------- state table (state 341 + index)

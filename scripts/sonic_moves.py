@@ -24,6 +24,18 @@ def tuck(pitch, **kw):
     return P(TUCK, root=(pitch, 0, 0), **kw)
 
 
+BALL_HIP = (0, -7.1, 0)     # hip offset that rests the spin ball (radius 4.5 round PIV) on the floor
+INJECT = {}                 # action -> [(game frame, order, command bytes)] merged into the game's own script (v61)
+
+
+def show_ball(names, f0, f1):
+    """v61: show the spin-ball model from game frame f0 and the body again from f1, in a script that is otherwise kept.
+    Until v60 the rolls, dodges and techs spun the curled-up body itself, which looked like a tumbling heap of limbs."""
+    for nm in ([names] if isinstance(names, str) else names):
+        INJECT.setdefault(nm, []).extend([(f0, 0, cmd("Change Model State", **{"Struct ID": 0, "Object ID": 1})),
+                                          (f1, 9, cmd("Change Model State", **{"Struct ID": 0, "Object ID": 0}))])
+
+
 FALL = P(ground=0, chest=(-5, 0, 0), footL=30, footR=30,
          armL=(1, 0.5, 0.1), foreL=(0.6, 1, 0.3), armR=(-1, 0.5, 0.1), foreR=(-0.6, 1, 0.3),
          thighL=(0.2, -1, 0.35), shinL=(0.12, -1, -0.35), thighR=(-0.2, -1, 0.0), shinR=(-0.12, -1, -0.6))
@@ -57,11 +69,11 @@ def ball(dmg, angle, bkb, kbg, size=4.7, id=0, wdsk=0):
     return Hit(id, 2, dmg, size, angle, bkb, kbg, off=PIV, wdsk=wdsk)
 
 
-def leg(side, dmg, angle, bkb, kbg, size=2.5, id=0, shin_dmg=None, wdsk=0):
+def leg(side, dmg, angle, bkb, kbg, size=2.5, id=0, shin_dmg=None, wdsk=0, elem=0):
     """Foot hitbox plus a slightly weaker, smaller shin hitbox."""
     th, sh, ft = LEGS[side]
-    return [Hit(id, ft, dmg, size, angle, bkb, kbg, off=(1.6, 0, 0), wdsk=wdsk),
-            Hit(id + 1, sh, shin_dmg or dmg, size * 0.8, angle, bkb, kbg, off=(2.4, 0, 0), wdsk=wdsk)]
+    return [Hit(id, ft, dmg, size, angle, bkb, kbg, off=(1.6, 0, 0), wdsk=wdsk, elem=elem),
+            Hit(id + 1, sh, shin_dmg or dmg, size * 0.8, angle, bkb, kbg, off=(2.4, 0, 0), wdsk=wdsk, elem=elem)]
 
 
 # ------------------------------------------------------------------ movement
@@ -97,16 +109,11 @@ TUMBLE = P(FLY, root=(-75, 0, 0), head=(10, 0, 0))
 anim("DamageFall", 29, [(0, TUMBLE), (14, P(FLY2, root=(-68, 0, 0), head=(10, 0, 0))), (29, TUMBLE)])
 
 # rolls and air dodge as a ball (the game's own travel is kept)
-anim("EscapeF", 32, [(0, S), (5, tuck(60, hip=(0, -5.3, 0))), (26, tuck(780, hip=(0, -5.3, 0)), "lin"), (32, P(S, root=(720, 0, 0)))], keep_root=True)
-anim("EscapeB", 32, [(0, S), (5, tuck(-60, hip=(0, -5.3, 0))), (26, tuck(-780, hip=(0, -5.3, 0)), "lin"), (32, P(S, root=(-720, 0, 0)))], keep_root=True)
+anim("EscapeF", 32, [(0, S), (5, tuck(60, hip=BALL_HIP)), (26, tuck(780, hip=BALL_HIP), "lin"), (32, P(S, root=(720, 0, 0)))], keep_root=True)
+anim("EscapeB", 32, [(0, S), (5, tuck(-60, hip=BALL_HIP)), (26, tuck(-780, hip=BALL_HIP), "lin"), (32, P(S, root=(-720, 0, 0)))], keep_root=True)
+show_ball(["EscapeF", "EscapeB"], 6, 27)
 
-# ------------------------------------------------------------------ shield (bubble bone 61 is held 8.3 units above the floor: the middle of Sonic)
-GUARD = P(root=(8, 0, 0), chest=(8, 0, 0), thighL=(0.25, -1, 0.45), shinL=(0.1, -1, -0.4), thighR=(-0.25, -1, 0.15), shinR=(-0.1, -1, -0.55),
-          armL=(0.55, -1, 0.25), foreL=(0.3, -0.6, 1), armR=(-0.55, -1, 0.25), foreR=(-0.3, -0.6, 1))
-anim("GuardOn", 8, [(0, S), (8, GUARD, "out")], shield_y=9.4)
-anim("Guard", 370, [(0, GUARD), (185, P(GUARD, chest=(15, 0, 0))), (370, GUARD)], shield_y=9.4)
-anim("GuardOff", 16, [(0, GUARD), (16, S)], shield_y=9.4)
-anim("GuardDamage", 20, [(0, GUARD), (4, P(GUARD, root=(-8, 0, 0), chest=(4, 0, 0)), "out"), (20, GUARD)], shield_y=9.4)
+# shield: see after the crouch (v58)
 
 # ------------------------------------------------------------------ ledge hang (hands placed where Falcon's scaled animation had them)
 AJ_BASE = r"C:\adventure-melee\work\v10\PlSnAJ_v10r.dat"
@@ -124,6 +131,90 @@ HANGS = P(HANGP, thighL=(0.1, -1, 0.3), thighR=(-0.1, -1, 0.15), shinL=(0.07, -1
 anim("CliffCatch", 8, [(0, HANGS), (8, HANGP)], keep=(1, 2, 3))
 anim("CliffWait1", 50, [(0, HANGP), (25, HANGS), (50, HANGP)], keep=(1, 2, 3))
 anim("CliffWait2", 56, [(0, HANGP), (14, HANGS), (28, HANGP), (42, P(HANGP, head=(-10, 40, 0))), (56, HANGP)], keep=(1, 2, 3))
+
+# ------------------------------------------------------------------ ledge get-ups and techs (v60; these were still Falcon's)
+# The game's root motion (bone 1) is kept and Falcon's body path (bone 3, which smooths the stepped root motion) is copied
+# onto Sonic's hip (hip_from), so where he ends up and every frame-data number stay the same. Hitbox frames of the ledge
+# attacks are unchanged: under 100% a two-foot kick on f24-29 (legs), over 100% a left-hand swipe on f37-40.
+
+
+def hang_for(name):
+    """the hanging pose with both hands on the ledge, at frame 0 of a ledge animation"""
+    tgt = np.mean(orig_bone_pos(AJ_BASE, name, 0, (25, 47)), axis=0)
+    root = falcon_track(name, 1, 0)[0][:3] - rest[1][:3]
+    off3 = falcon_track(name, 3, 0)[0][:3] - rest[3][:3]
+    w = solve(P(HANG0, fy=1.0))[0]
+    hands = (w[25][:3, 3] + w[47][:3, 3]) / 2
+    return P(HANG0, hip=tuple(tgt - root - off3 - hands))
+
+
+LPULL = P(ground=0, root=(10, 0, 0), chest=(18, 0, 0), head=(-25, 0, 0), footL=30, footR=30,
+          armL=(0.35, 0.5, 0.65), foreL=(0.05, 1, 0.25), armR=(-0.35, 0.5, 0.65), foreR=(-0.05, 1, 0.25),
+          thighL=(0.1, -0.25, 1), shinL=(0.05, -1, 0.1), thighR=(-0.1, -0.6, 0.8), shinR=(-0.05, -1, -0.2))
+LKNEE = P(ground=0, root=(25, 0, 0), chest=(20, 0, 0), head=(-30, 0, 0),
+          armL=(0.3, -1, 0.35), foreL=(0.1, -1, 0.15), armR=(-0.3, -1, 0.35), foreR=(-0.1, -1, 0.15),
+          thighL=(0.1, 0.2, 1), shinL=(0.05, -1, -0.1), thighR=(-0.1, -1, -0.3), shinR=(-0.05, -1, -0.5))
+LBALL = lambda pitch: tuck(pitch, hip=BALL_HIP, fy=0.0)                                  # noqa: E731
+LKICK = P(ground=1, root=(-40, 0, 0), chest=(12, 0, 0), head=(18, 0, 0), footL=-25, footR=-25,       # two-foot kick, sat back on his hands
+          armL=(0.5, -1, -0.6), foreL=(0.2, -1, -0.25), armR=(-0.5, -1, -0.6), foreR=(-0.2, -1, -0.25),
+          thighL=(0.15, -0.05, 1), shinL=(0.05, -0.1, 1), thighR=(-0.15, 0.05, 1), shinR=(-0.05, 0.0, 1))
+LCOIL = P(LKICK, thighL=(0.15, 0.5, 0.8), shinL=(0.05, -1, 0.3), thighR=(-0.15, 0.55, 0.8), shinR=(-0.05, -1, 0.25))
+LSWIPE0 = P(CROUCH, chest=(20, 40, 0), armL=(0.6, 0.3, -0.7), foreL=(0.3, 0.2, -1))                # left arm drawn back
+LSWIPE = P(CROUCH, root=(15, 0, 0), chest=(15, -45, 0), armL=(0.05, 0.0, 1), foreL=(-0.05, 0.05, 1))  # swiped forward
+
+
+def ledge(name, T, keys, pin=0, **kw):
+    """Ledge animation: hang pose at frame 0, Falcon's body path on the hip, hands held on the ledge (arm IK) until frame
+    `pin` (released over the last 3 frames). Written as one key per frame."""
+    h = hang_for(name)
+    carry = {id(HANGS): 1.0, id(HANGP): 1.0, id(LPULL): 0.7, id(LKNEE): 0.35}   # keep the hands-on-ledge offset, fading out
+    ks = [(0, h)]
+    for k_ in keys:
+        f_, p_ = k_[0], k_[1]
+        if id(p_) in carry:
+            c_ = carry[id(p_)]
+            p_ = P(p_, hip=tuple(np.array(h["hip"], dtype=float) * c_), root=tuple(np.array(h["root"], dtype=float) * c_ + np.array(p_["root"], dtype=float) * (1 - c_)))
+        ks.append((f_, p_) + tuple(k_[2:]))
+    off = falcon_track(name, 3, T)[:, :3] - rest[3][:3]
+    tr = falcon_track(name, 1, T)[:, :3] - rest[1][:3]
+    hand = {"L": orig_bone_pos(AJ_BASE, name, 0, (25,))[0], "R": orig_bone_pos(AJ_BASE, name, 0, (47,))[0]}
+    dense = []
+    for f_, p_ in enumerate(sample(ks, T)):
+        o_ = off[f_].copy()
+        o_[1] *= float(p_["fy"])
+        p_ = P(p_, hip=tuple(np.array(p_["hip"], dtype=float) + o_))
+        if f_ <= pin:
+            w_ = 1.0 if f_ <= pin - 3 else (pin - f_) / 3.0
+            q_ = p_
+            for side, pole in (("L", (1, 0.2, -0.6)), ("R", (-1, 0.2, -0.6))):
+                q_ = reach(q_, side, hand[side] - tr[f_], pole=pole)
+            p_ = lerp_pose(p_, q_, w_)
+        dense.append((f_, p_, "lin"))
+    anim(name, T, dense, keep_root=True, **kw)
+
+
+ledge("CliffClimbQuick", 33, [(7, LPULL), (14, LKNEE), (20, CROUCH), (33, S)], pin=17)
+ledge("CliffClimbSlow", 59, [(12, HANGS), (20, HANGP), (27, LPULL), (34, LKNEE), (41, CROUCH), (59, S)], pin=37)
+ledge("CliffEscapeQuick", 49, [(6, LPULL), (12, LKNEE), (18, LBALL(30)), (34, LBALL(390), "lin"), (40, P(CROUCH, root=(390, 0, 0))), (49, P(S, root=(360, 0, 0)))], pin=15)
+ledge("CliffEscapeSlow", 79, [(10, HANGS), (18, LPULL), (28, LKNEE), (36, CROUCH), (42, LBALL(30)), (58, LBALL(390), "lin"),
+                              (64, P(CROUCH, root=(390, 0, 0))), (79, P(S, root=(360, 0, 0)))], pin=32)
+ledge("CliffAttackQuick", 55, [(6, LPULL), (13, LKNEE), (19, CROUCH), (22, LCOIL), (24, LKICK, "out"), (29, LKICK), (37, CROUCH), (55, S)], pin=16)
+ledge("CliffAttackSlow", 69, [(10, HANGS), (18, LPULL), (24, LKNEE), (30, CROUCH), (35, LSWIPE0), (37, LSWIPE, "out"), (41, LSWIPE), (50, CROUCH), (69, S)], pin=27)
+ledge("CliffJumpQuick1", 12, [(6, LPULL), (12, CROUCH)], pin=9)
+ledge("CliffJumpSlow1", 19, [(7, HANGS), (13, LPULL), (19, CROUCH)], pin=15)
+show_ball("CliffEscapeQuick", 19, 35)
+show_ball("CliffEscapeSlow", 43, 59)
+show_ball("CliffJumpQuick2", 5, 27)
+show_ball("CliffJumpSlow2", 5, 30)
+anim("CliffJumpQuick2", 33, [(0, CROUCH), (4, tuck(60)), (26, tuck(630), "lin"), (33, P(FALL, root=(720, 0, 0)), "lin")], keep_root=True)
+anim("CliffJumpSlow2", 36, [(0, CROUCH), (4, tuck(60)), (29, tuck(630), "lin"), (36, P(FALL, root=(720, 0, 0)), "lin")], keep_root=True)
+# techs: in place = a quick spin up off the floor; tech rolls = the same ball roll as his shield rolls
+anim("Passive", 26, [(0, LBALL(-30)), (10, LBALL(330), "lin"), (16, P(CROUCH, root=(390, 0, 0))), (26, P(S, root=(360, 0, 0)))], keep_root=True)
+anim("PassiveStandF", 40, [(0, LBALL(0)), (30, LBALL(720), "lin"), (35, P(CROUCH, root=(750, 0, 0))), (40, P(S, root=(720, 0, 0)))], keep_root=True)
+anim("PassiveStandB", 40, [(0, LBALL(0)), (30, LBALL(-720), "lin"), (35, P(CROUCH, root=(-690, 0, 0))), (40, P(S, root=(-720, 0, 0)))], keep_root=True)
+
+show_ball("Passive", 1, 11)
+show_ball(["PassiveStandF", "PassiveStandB"], 1, 31)
 
 # ------------------------------------------------------------------ grab and throws (Falcon's scripts and timings; hit/release frames unchanged)
 REACH = P(root=(22, 0, 0), chest=(10, 0, 0), head=(-20, 0, 0), armL=(0.3, 0.0, 1), foreL=(0.1, 0.05, 1), armR=(-0.3, 0.0, 1), foreR=(-0.1, 0.05, 1),
@@ -165,6 +256,182 @@ DUCK = reach(_DB, "R", head_point(_DB, (-0.6, 0.7, 0.6), 0.9), pole=(-1, 0.3, -0
 anim("Squat", 8, [(0, S), (8, DUCK, "out")])
 anim("SquatWait", 158, [(0, DUCK), (79, P(DUCK, chest=(53, 0, 0))), (158, DUCK)])
 anim("SquatRv", 10, [(0, DUCK), (10, S)])
+
+# ------------------------------------------------------------------ shield (v58)
+# v58 shielded in the curled crouch with the bubble bone at 6.6 (v57: upright guard, 9.4).
+# v61: the curled crouch still looked broken in game: inside the bubble the dark fur blends into the bubble colour and only
+# the skin-coloured arms, muzzle and thin legs show, as loose blocks. Sonic now guards the way he always has, curled into his
+# spin ball (Sonic 1-3: rolled up he is protected; the Sonic 3 shields sit round him the same way). The ball model (part 19)
+# is shown through the whole guard, so there are no limbs to come apart. Bubble bone height 6.6 -> 4.6 (the ball's centre).
+# The game does not play the guard animations: it holds one frame of them (a first try with a 120-frame spinning Guard put
+# him in the bind pose, the game reads frames up to the original 370) and it ignores model changes in their scripts. So
+# every guard animation is the same still curled pose at its original length, and the ball model is switched on by the
+# fighter code (OnFrame in fighter_code/sonic.c).
+SHIELD_Y = 4.6
+GUARD = tuck(20, hip=(0, SHIELD_Y - 11.62, 0))      # the ball's centre (PIV) sits SHIELD_Y above the floor
+anim("GuardOn", 8, [(0, GUARD), (8, GUARD)], shield_y=SHIELD_Y)
+anim("Guard", 370, [(0, GUARD), (370, GUARD)], shield_y=SHIELD_Y)
+anim("GuardOff", 16, [(0, GUARD), (6, P(CROUCH, root=(20, 0, 0))), (16, S)], shield_y=SHIELD_Y)
+anim("GuardDamage", 20, [(0, GUARD), (4, P(GUARD, root=(6, 0, 0)), "out"), (20, GUARD)], shield_y=SHIELD_Y)
+
+# spot dodge and air dodge (v58; these were still Captain Falcon's animations): a quick spin curl in place, like the rolls.
+# Same lengths as before (33 and 50 frames), and the game's own root motion is kept, so the dodge frame data do not change.
+anim("EscapeN", 33, [(0, S), (3, tuck(30, hip=BALL_HIP)), (16, tuck(390, hip=BALL_HIP), "lin"), (21, P(S, root=(360, 0, 0))),
+                     (33, P(S, root=(360, 0, 0)))], keep_root=True)
+anim("EscapeAir", 50, [(0, FALL), (3, tuck(60)), (24, tuck(420), "lin"), (30, P(FALL, root=(360, 0, 0)), "lin"), (50, P(FALL, root=(360, 0, 0)))],
+     keep_root=True)
+show_ball("EscapeN", 4, 17)
+# v61: the spot dodge is the Insta-Shield (Sonic 3: a split second of invincibility): the white crescent flashes round the ball
+INJECT["EscapeN"] += [(5, 0, cmd("Change Model State", **{"Struct ID": 1, "Object ID": 2})), (15, 9, cmd("Change Model State", **{"Struct ID": 1, "Object ID": 0}))]
+show_ball("EscapeAir", 4, 25)
+# dizzy after a shield break (FuraFura, 100 frames; was Falcon's): swaying from side to side, head lolling, arms hanging
+DZ1 = P(S, root=(12, 0, 9), chest=(10, 0, 0), head=(18, 0, 16), armL=(0.3, -1, 0.3), foreL=(0.15, -1, 0.35),
+        armR=(-0.3, -1, 0.3), foreR=(-0.15, -1, 0.35))
+DZ2 = P(DZ1, root=(12, 0, -9), head=(18, 0, -16))
+anim("FuraFura", 100, [(0, DZ1), (25, DZ2), (50, DZ1), (75, DZ2), (100, DZ1)])
+# ------------------------------------------------------------------ knockdown, get-ups, grabbed, asleep, walls (v61)
+# All of these were still Captain Falcon's motion scaled onto Sonic: lying down he sank into the floor up to his ears, and
+# the get-ups were a jumble. Same lengths as Falcon's, scripts (intangibility, hitbox frames) untouched. Lying poses rest on
+# the floor by the lowest point of the whole body ("floor", sonic_anim_lib.lowest).
+
+
+def fanim(name, t_auth, keys, **kw):
+    """an animation written against a length of t_auth frames, stretched by moving its last key to the original length"""
+    T = falcon_len(name)
+    if abs(T - t_auth) > 1:
+        print(f"note: {name} authored for {t_auth} frames, original has {T}")
+    anim(name, T, [((T if k_[0] == t_auth else k_[0]),) + tuple(k_[1:]) for k_ in keys], **kw)
+
+
+LIE_U = P(ground=0, floor=1, root=(-82, 0, 0), chest=(14, 0, 0), head=(38, 0, 0), footL=25, footR=25,          # on his back, feet forward
+          armL=(1, 0.3, -0.12), foreL=(0.9, -0.5, -0.05), armR=(-1, -0.1, -0.12), foreR=(-0.6, 0.8, -0.05),
+          thighL=(0.28, -1, 0.1), shinL=(0.12, -1, -0.12), thighR=(-0.22, -1, 0.34), shinR=(-0.1, -1, -0.5))
+FLAIL_U = P(LIE_U, root=(-70, 0, 0), chest=(25, 0, 0), armL=(1, 0.2, 0.6), foreL=(0.6, 0.3, 1), armR=(-1, 0.2, 0.6), foreR=(-0.6, 0.3, 1),
+            thighL=(0.3, -0.5, 1), shinL=(0.15, -1, 0.3), thighR=(-0.3, -0.3, 1), shinR=(-0.15, -1, 0.1))
+SIT_U = P(ground=0, floor=1, root=(-28, 0, 0), chest=(26, 0, 0), head=(6, 0, 0), footL=10, footR=10,           # sitting up, hands on the floor
+          armL=(0.45, -1, -0.55), foreL=(0.2, -1, -0.2), armR=(-0.45, -1, -0.55), foreR=(-0.2, -1, -0.2),
+          thighL=(0.25, 0.1, 1), shinL=(0.08, -0.7, 0.75), thighR=(-0.25, 0.25, 1), shinR=(-0.08, -1, 0.3))
+LIE_D = P(ground=0, floor=1, root=(84, 0, 0), chest=(-6, 0, 0), head=(-58, 0, 0), footL=55, footR=55,          # on his front, head forward
+          armL=(0.75, 0.65, 0.12), foreL=(0.1, 1, 0.1), armR=(-0.9, -0.3, 0.12), foreR=(-0.4, -1, 0.1),
+          thighL=(0.2, -1, 0.03), shinL=(0.1, -1, 0.06), thighR=(-0.3, -1, 0.03), shinR=(-0.12, -1, 0.1))
+FLAIL_D = P(LIE_D, root=(72, 0, 0), head=(-45, 0, 0), armL=(1, 0.5, -0.4), foreL=(0.7, 0.6, -0.6), armR=(-1, 0.5, -0.4), foreR=(-0.7, 0.6, -0.6),
+            thighL=(0.3, -1, -0.45), shinL=(0.15, -0.6, -1), thighR=(-0.3, -1, -0.3), shinR=(-0.15, -0.8, -1))
+PUSH_D = P(ground=0, floor=1, root=(55, 0, 0), chest=(-10, 0, 0), head=(-45, 0, 0), footL=20, footR=20,        # pushing up on hands and knees
+           armL=(0.3, -0.35, 1), foreL=(0.1, -0.3, 1), armR=(-0.3, -0.35, 1), foreR=(-0.1, -0.3, 1),
+           thighL=(0.2, -0.4, 1), shinL=(0.1, -1, -0.5), thighR=(-0.2, -0.55, 1), shinR=(-0.1, -1, -0.45))
+CRF = P(CROUCH, floor=1)
+FB = lambda pitch: tuck(pitch, hip=BALL_HIP)        # noqa: E731  the spin ball rolling along the floor
+
+fanim("DownBoundU", 25, [(0, P(FLAIL_U, up=0.0)), (9, P(FLAIL_U, root=(-95, 0, 0), up=3.4), "out"), (19, P(FLAIL_U, up=0.0), "in"), (25, LIE_U)])
+fanim("DownWaitU", 69, [(0, LIE_U), (34, P(LIE_U, chest=(18, 0, 0), head=(34, 0, 0))), (69, LIE_U)])
+fanim("DownDamageU", 13, [(0, LIE_U), (3, P(FLAIL_U, up=1.6), "out"), (9, LIE_U, "in"), (13, LIE_U)])
+fanim("DownStandU", 29, [(0, LIE_U), (9, SIT_U), (17, CRF), (29, S)])
+fanim("DownBoundD", 25, [(0, P(FLAIL_D, up=0.0)), (9, P(FLAIL_D, root=(95, 0, 0), up=3.4), "out"), (19, P(FLAIL_D, up=0.0), "in"), (25, LIE_D)])
+fanim("DownWaitD", 69, [(0, LIE_D), (34, P(LIE_D, head=(-54, 0, 0), chest=(-9, 0, 0))), (69, LIE_D)])
+fanim("DownDamageD", 13, [(0, LIE_D), (3, P(FLAIL_D, up=1.6), "out"), (9, LIE_D, "in"), (13, LIE_D)])
+fanim("DownStandD", 29, [(0, LIE_D), (9, PUSH_D), (17, CRF), (29, S)])
+fanim("DownSpotD", 19, [(0, S), (7, CRF), (13, PUSH_D), (19, LIE_D)])
+# get-up rolls: curls up from the floor and rolls away (the game's travel kept), like his other rolls
+fanim("DownFowardU", 35, [(0, LIE_U), (6, FB(30)), (26, FB(750), "lin"), (30, P(CRF, root=(750, 0, 0))), (35, P(S, root=(720, 0, 0)))], keep_root=True)
+fanim("DownBackU", 35, [(0, LIE_U), (6, FB(-110)), (26, FB(-750), "lin"), (30, P(CRF, root=(-690, 0, 0))), (35, P(S, root=(-720, 0, 0)))], keep_root=True)
+fanim("DownFowardD", 35, [(0, LIE_D), (6, FB(120)), (26, FB(750), "lin"), (30, P(CRF, root=(750, 0, 0))), (35, P(S, root=(720, 0, 0)))], keep_root=True)
+fanim("DownBackD", 35, [(0, LIE_D), (6, FB(30)), (26, FB(-690), "lin"), (30, P(CRF, root=(-690, 0, 0))), (35, P(S, root=(-720, 0, 0)))], keep_root=True)
+show_ball(["DownFowardU", "DownBackU", "DownFowardD", "DownBackD"], 7, 27)
+# get-up attack from his back: a breakdance windmill (legs split, spinning on his shoulders). Falcon's script is kept: both
+# legs hit on both sides at f19-20 and f28-29, 6% each, so the legs point forward/back on exactly those frames.
+_WM = dict(ground=0, floor=1, chest=(30, 0, 0), head=(40, 0, 0), footL=-10, footR=-10,
+           armL=(1, -0.2, -0.4), foreL=(0.6, -0.8, -0.3), armR=(-1, -0.2, -0.4), foreR=(-0.6, -0.8, -0.3),
+           thighL=(0.1, -0.75, 1), shinL=(0.05, -0.8, 1), thighR=(-0.1, -0.55, -1), shinR=(-0.05, -0.5, -1))
+WM = lambda yaw, pitch=-118: P(root=(pitch, yaw, 0), **_WM)      # noqa: E731
+fanim("DownAttackU", 49, [(0, LIE_U), (9, P(TUCK, root=(-60, -150, 0), floor=1)), (15, WM(-60), "lin"), (18, WM(0), "lin"), (27.5, WM(180), "lin"),
+                         (31, WM(250), "lin"), (37, P(CRF, root=(30, 360, 0))), (49, P(S, root=(0, 360, 0)))])
+# get-up attack from his front: Falcon's script hits behind with the right leg at f20-21, then in front with it at f26-27:
+# a mule kick back off his hands, then he swings the same leg round into a low kick forward.
+MULE = P(ground=0, floor=1, root=(62, 0, 0), chest=(-12, 0, 0), head=(-50, 0, 0), footR=40,
+         armL=(0.3, -0.4, 1), foreL=(0.1, -0.35, 1), armR=(-0.3, -0.4, 1), foreR=(-0.1, -0.35, 1),
+         thighL=(0.25, -0.2, 1), shinL=(0.1, -1, -0.4), thighR=(-0.15, -1, -0.3), shinR=(-0.1, -1, -0.25))
+MULE0 = P(MULE, thighR=(-0.2, -0.3, 1), shinR=(-0.1, -1, -0.6))
+FKICK = P(ground=0, floor=1, root=(-28, 0, 0), chest=(22, 0, 0), head=(10, 0, 0), footR=-20,
+          armL=(0.5, -1, -0.5), foreL=(0.2, -1, -0.2), armR=(-0.8, -0.3, -0.5), foreR=(-0.6, -0.5, 0.2),
+          thighL=(0.2, -1, -0.1), shinL=(0.1, -1, -0.5), thighR=(-0.15, 0.25, 1), shinR=(-0.08, 0.2, 1))
+fanim("DownAttackD", 49, [(0, LIE_D), (12, PUSH_D), (16, MULE0), (19, MULE, "out"), (21, MULE), (25, FKICK, "out"),
+                         (27, P(FKICK, thighR=(-0.15, -0.05, 1), shinR=(-0.08, -0.1, 1))), (36, CRF), (49, S)])
+
+# grabbed: standing (Hi) or dragged down on one knee (Lw), tugging at the hand on his chest and kicking
+CAP_HI = P(root=(-12, 0, 0), chest=(-8, 0, 0), head=(-24, 0, 0), armL=(0.4, 0.25, 1), foreL=(-0.5, 0.6, 0.4), armR=(-0.4, 0.25, 1), foreR=(0.5, 0.6, 0.4),
+           thighL=(0.14, -1, 0.3), shinL=(0.08, -1, -0.1), thighR=(-0.14, -1, 0.05), shinR=(-0.08, -1, -0.35))
+CAP_HI2 = P(CAP_HI, root=(-6, 0, 6), head=(-14, 10, 0), thighL=(0.14, -1, 0.1), shinL=(0.08, -1, -0.35), thighR=(-0.14, -1, 0.35), shinR=(-0.08, -1, -0.05))
+CAP_LW = P(root=(-20, 0, 0), chest=(-6, 0, 0), head=(-28, 0, 0), armL=(0.4, 0.5, 0.9), foreL=(-0.5, 0.7, 0.3), armR=(-0.4, 0.5, 0.9), foreR=(0.5, 0.7, 0.3),
+           thighL=(0.2, -0.15, 1), shinL=(0.1, -1, 0.1), thighR=(-0.2, -1, 0.15), shinR=(-0.1, -0.15, -1), footR=50)
+CAP_LW2 = P(CAP_LW, root=(-14, 0, 5), head=(-18, 12, 0))
+CAP_OW = lambda b: P(b, root=(b["root"][0] - 14, 0, 0), head=(-45, 0, 0), armL=(1, 0.4, 0.3), foreL=(0.6, 1, 0.3), armR=(-1, 0.4, 0.3), foreR=(-0.6, 1, 0.3))  # noqa: E731
+fanim("CapturePulledHi", 19, [(0, P(HURT, root=(10, 0, 0))), (8, CAP_HI2, "out"), (19, CAP_HI)])
+fanim("CaptureWaitHi", 49, [(0, CAP_HI), (12, CAP_HI2), (24, CAP_HI), (36, mirror(CAP_HI2)), (49, CAP_HI)])
+fanim("CaptureDamageHi", 19, [(0, CAP_HI), (3, CAP_OW(CAP_HI), "out"), (12, CAP_HI2), (19, CAP_HI)])
+fanim("CapturePulledLw", 19, [(0, P(HURT, root=(10, 0, 0))), (8, CAP_LW2, "out"), (19, CAP_LW)])
+fanim("CaptureWaitLw", 34, [(0, CAP_LW), (17, CAP_LW2), (34, CAP_LW)])
+fanim("CaptureDamageLw", 19, [(0, CAP_LW), (3, CAP_OW(CAP_LW), "out"), (12, CAP_LW2), (19, CAP_LW)])
+fanim("CaptureCut", 29, [(0, CAP_HI), (6, P(HURT, root=(-26, 0, 0)), "out"), (18, P(HURT, root=(-10, 0, 0))), (29, S)])
+fanim("CaptureJump", 49, [(0, CAP_HI), (6, tuck(-40)), (30, tuck(-760), "lin"), (38, P(FALL, root=(-720, 0, 0))), (49, P(FALL, root=(-720, 0, 0)))])
+show_ball("CaptureJump", 7, 31)
+
+# asleep (Jigglypuff's Sing and the like): he sits down and nods off, chin on his chest, the way he gives up waiting in the
+# old games; wakes with a start
+SIT_Z = P(ground=0, floor=1, root=(-16, 0, 0), chest=(30, 0, 0), head=(34, 0, 8), footL=-10, footR=-10,
+          armL=(0.5, -1, 0.3), foreL=(0.0, -0.8, 1), armR=(-0.5, -1, 0.3), foreR=(0.0, -0.8, 1),
+          thighL=(0.4, 0.3, 1), shinL=(0.1, -0.9, 0.6), thighR=(-0.4, 0.3, 1), shinR=(-0.1, -0.9, 0.6))
+SIT_Z2 = P(SIT_Z, chest=(36, 0, 0), head=(42, 0, -6))
+fanim("FuraSleepStart", 29, [(0, S), (8, P(S, root=(8, 0, 6), head=(25, 0, 10))), (18, CRF), (29, SIT_Z)])
+fanim("FuraSleepLoop", 109, [(0, SIT_Z), (54, SIT_Z2), (109, SIT_Z)])
+fanim("FuraSleepEnd", 59, [(0, SIT_Z), (10, P(SIT_Z, chest=(10, 0, 0), head=(-20, 0, 0)), "out"), (24, P(SIT_Z, chest=(10, 0, 0), head=(-10, 40, 0))),
+                          (38, CRF), (59, S)])
+
+# small ones: attack clank recoil, dropping through a platform, wall and ceiling techs, bumping a wall or ceiling, wall splat
+RECOIL = P(S, root=(-20, 0, 0), chest=(-14, 0, 0), head=(-20, 0, 0), armL=(0.9, 0.3, -0.5), foreL=(0.8, 0.8, 0.2), armR=(-0.9, 0.3, -0.5), foreR=(-0.8, 0.8, 0.2),
+           thighL=(0.12, -1, 0.45), shinL=(0.08, -1, 0.05), thighR=(-0.12, -1, 0.1), shinR=(-0.08, -1, -0.4))
+fanim("Rebound", 29, [(0, S), (4, RECOIL, "out"), (16, P(RECOIL, root=(-10, 0, 0))), (29, S)])
+fanim("Pass", 29, [(0, P(CROUCH, ground=0, hip=(0, -3.0, 0))), (9, FALL), (19, FALL2), (29, FALL)])
+fanim("PassiveWall", 25, [(0, tuck(-30)), (14, tuck(-390), "lin"), (19, P(FALL, root=(-360, 0, 0))), (25, P(FALL, root=(-360, 0, 0)))], keep_root=True)
+fanim("PassiveWallJump", 39, [(0, tuck(-30)), (5, tuck(-60)), (30, tuck(-750), "lin"), (35, P(FALL, root=(-720, 0, 0))), (39, P(FALL, root=(-720, 0, 0)))], keep_root=True)
+fanim("PassiveCeil", 25, [(0, tuck(30)), (14, tuck(390), "lin"), (19, P(FALL, root=(360, 0, 0))), (25, P(FALL, root=(360, 0, 0)))], keep_root=True)
+show_ball(["PassiveWall", "PassiveCeil"], 1, 15)
+show_ball("PassiveWallJump", 1, 31)
+BUMP = P(S, root=(-14, 0, 0), chest=(-10, 0, 0), head=(-28, 0, 0), armL=(0.5, 0.2, 1), foreL=(0.2, 0.9, 0.6), armR=(-0.5, 0.2, 1), foreR=(-0.2, 0.9, 0.6))
+fanim("StopWall", 20, [(0, P(S, root=(14, 0, 0))), (3, BUMP, "out"), (10, P(BUMP, root=(-8, 0, 0))), (20, S)], keep_root=True)
+fanim("StopCeil", 7, [(0, P(FALL, head=(30, 0, 0), chest=(15, 0, 0), armL=(1, 0.9, 0.2), foreL=(0.3, 1, 0.4), armR=(-1, 0.9, 0.2), foreR=(-0.3, 1, 0.4))), (7, FALL)],
+     keep_root=True)
+fanim("MissFoot", 25, [(0, P(HURT, root=(-10, 0, 0))), (8, P(FLY, root=(-40, 0, 0))), (25, TUMBLE)])
+SPLAT = P(ground=0, root=(-8, 0, 0), chest=(-12, 0, 0), head=(-30, 0, 0), armL=(1, 0.7, -0.3), foreL=(0.9, 1, -0.2), armR=(-1, 0.7, -0.3), foreR=(-0.9, 1, -0.2),
+          thighL=(0.6, -1, -0.2), shinL=(0.4, -1, -0.4), thighR=(-0.6, -1, -0.2), shinR=(-0.4, -1, -0.4), footL=30, footR=30)
+fanim("WallDamage", 49, [(0, SPLAT), (10, P(SPLAT, head=(-36, 0, 0))), (26, FLY), (49, TUMBLE)], keep_root=True)
+
+# ------------------------------------------------------------------ items and the rest of Falcon's leftovers (v61)
+# Picking up, throwing, swinging and shooting items, carrying crates, the hammer, the parasol, the Super Scope: about 45
+# animations that were Falcon's joint values on Sonic's body (squashed, feet under the floor). They are re-posed frame by
+# frame from Falcon's limb directions with Sonic's solver (sonic_anim_lib.retarget): same timing, same hand path for the
+# item, feet planted. Scripts (release frames, item hitboxes) untouched.
+for _nm in ("LightGet", "LightThrowF", "LightThrowB", "LightThrowHi", "LightThrowLw", "LightThrowDash", "LightThrowDrop",
+            "HeavyGet", "HeavyWalk1", "HeavyWalk2", "HeavyThrowF", "HeavyThrowB", "HeavyThrowHi", "HeavyThrowLw",
+            "Swing1", "Swing3", "Swing41", "Swing42", "SwingDash", "ItemHammerWait", "ItemHammerMove", "ItemParasolOpen",
+            "ItemShoot", "ItemBlind", "ItemScopeStart", "ItemScopeRapid", "ItemScopeFire", "ItemScopeEnd",
+            "Attack100Start", "Attack100Loop", "Attack100End"):
+    _k = retarget(_nm)
+    _n = len(_k) - 1
+    # one-shot moves start and/or end in Sonic's own stance (Falcon's wide idle would pop against Sonic's idle)
+    _in = _nm in ("LightGet", "LightThrowF", "LightThrowB", "LightThrowHi", "LightThrowLw", "LightThrowDrop", "Swing1", "Swing3", "Swing41", "Swing42", "ItemShoot")
+    _out = _in or _nm in ("LightThrowDash", "SwingDash", "HeavyThrowF", "HeavyThrowB", "HeavyThrowHi", "HeavyThrowLw", "ItemScopeEnd", "Attack100End")
+    _k = [(f_, lerp_pose(S, p_, min(1.0, (f_ / 4.0) if _in else 1.0, ((_n - f_) / 5.0) if _out else 1.0)), "lin") for f_, p_, _e in _k]
+    anim(_nm, _n, _k, keep_root=True)
+for _nm in ("LightThrowAirF", "LightThrowAirB", "LightThrowAirHi", "LightThrowAirLw", "ItemParasolFall", "ItemShootAir",
+            "ItemScrewDamage", "ItemScopeAirStart", "ItemScopeAirRapid", "ItemScopeAirFire", "ItemScopeAirEnd"):
+    _k = retarget(_nm, ground=0.0)
+    anim(_nm, len(_k) - 1, _k, keep_root=True)
+# Screw Attack item: his own spin jump
+_T = len(falcon_frames("ItemScrew")) - 1
+anim("ItemScrew", _T, [(0, S), (3, tuck(60)), (_T, tuck(60 + 36 * (_T - 3)), "lin")], keep_root=True)
+_T = len(falcon_frames("ItemScrewAir")) - 1
+anim("ItemScrewAir", _T, [(0, FALL), (3, tuck(60)), (_T, tuck(60 + 36 * (_T - 3)), "lin")], keep_root=True)
+
 # idle 3: the impatient foot tap, hands on hips, looking out at the player (Sonic 1/2/3)
 TAP = P(S, root=(0, -72, 0), chest=(-4, 0, 0), head=(-4, -12, 0), armL=(0.9, -1, -0.2), foreL=(-0.7, -0.5, 0.4), armR=(-0.9, -1, -0.2), foreR=(0.7, -0.5, 0.4),
         thighL=(0.12, -1, 0.02), shinL=(0.08, -1, -0.05), thighR=(-0.25, -1, 0.3), shinR=(-0.1, -1, 0.0), footR=-30)
@@ -257,7 +524,7 @@ SOM_K = P(DUCK, root=(366, 0, 0), chest=(35, 0, 0), thighR=(-0.2, -0.05, 1), shi
 move("DownTilt", "AttackLw3", 26,
      [(0, DUCK), (3, tuck(45, hip=(0, -7.1, 0), move=1.0)), (10, tuck(360, hip=(0, -7.1, 0), move=7.0), "lin"), (12, SOM_K, "out"), (15, SOM_K),
       (20, P(DUCK, root=(366, 0, 0), move=7.5)), (26, P(DUCK, root=(366, 0, 0), move=7.5))],
-     [(4, 10, [ball(4, 60, 0, 100, size=4.0, wdsk=22)]), (12, 14, leg("R", 5, 85, 40, 70, size=2.6, shin_dmg=5))], iasa=23, ball=(3, 11))
+     [(4, 10, [ball(4, 60, 0, 100, size=4.0, wdsk=22)]), (12, 14, leg("R", 5, 85, 40, 70, size=2.6, shin_dmg=5, elem=1))], iasa=23, ball=(3, 11))   # v61: flame kick = SA2's Fire Somersault (Flame Ring)
 
 
 # forward smash: Chaos Emerald thrust (swapped with the forward tilt in v47). v49: the wind-up peaks on the charge frame (7) with
@@ -344,8 +611,10 @@ FLY = P(ground=0, pivot=(0, 2.0, 0), root=(80, 0, 0), chest=(-12, 0, 0), head=(-
         armL=(0.45, -1, -0.25), foreL=(0.3, -1, -0.35), armR=(-0.45, -1, -0.25), foreR=(-0.3, -1, -0.35),
         thighL=(0.07, -1, -0.05), shinL=(0.05, -1, -0.12), thighR=(-0.07, -1, -0.12), shinR=(-0.05, -1, -0.25))
 GB = dict(hip=(0, -7.1, 0))
-move("HomingAttack", ["SpecialAirN", "SpecialN"], 40, [(0, FALL), (3, tuck(90)), (40, tuck(1200), "lin")],
-     [(1, 40, [ball(8, 60, 40, 70)])], ball=(3, 0))
+# v58: 40 -> 70 frames so the animation outlasts the dash (24) + end lag (44); ball only during the dash, then he uncurls
+# and falls for the end lag. Hitbox f1-40 -> f1-24 (the end lag no longer hits).
+move("HomingAttack", ["SpecialAirN", "SpecialN"], 90, [(0, FALL), (3, tuck(90)), (26, tuck(895), "lin"), (33, P(FALL, root=(1080, 0, 0)), "lin"),
+                                                       (90, P(FALL, root=(1080, 0, 0)))], [(1, 24, [ball(8, 60, 40, 70)])], ball=(3, 27))
 move("SpinDashCharge", "SpecialSStart", 190, [(0, S), (6, tuck(60, **GB)), (190, tuck(60 + 184 * 40, **GB), "lin")], [], ball=(7, 0))
 move("SpinDash", "SpecialS", 40, [(0, tuck(0, **GB)), (4, tuck(128, hip=(0, -4.8, 0)), "out"), (9, tuck(288, **GB), "in"), (30, tuck(960, **GB), "lin"), (36, P(CROUCH, root=(1080, 0, 0)), "lin"), (40, P(S, root=(1080, 0, 0)))],
      [(1, 32, [ball(10, 50, 35, 75)])], ball=(1, 31))
@@ -576,6 +845,34 @@ if __name__ == "__main__":
                     ed(b, sa.parse(bytes(b))[0])
                 out += bytes(b)
             scripts[name] = out
+        for name, extra in INJECT.items():        # v61: the game's own commands at their own frames, plus ours
+            a = acts[name]
+            if name in scripts or a.cmds[-1]["name"] != "End Of Script" or any(c["name"] in ("Go To", "Subroutine", "Return", "Set Loop", "Execute Loop") for c in a.cmds):
+                print("inject skipped (script rewritten or has jumps):", name)
+                continue
+            cur, seq = 1, []
+            for idx, c in enumerate(a.cmds[:-1]):
+                bts = bytearray(a.data[c["off"]:c["off"] + c["len"]])
+                pc = sa.parse(bytes(bts))[0]
+                if c["name"] == "Asynchronous Timer":
+                    cur = pc["params"]["Frame"]
+                elif c["name"] == "Synchronous Timer":
+                    cur += pc["params"]["Frame"]
+                else:
+                    for key in [k_ for k_ in pc["params"] if k_.startswith("SFX ID")]:
+                        if 60000 <= pc["params"][key] < 70000:
+                            sa.set_param(bts, pc, key, GRUNT[pc["params"][key] % 5])
+                    seq.append((cur, 1, idx, bytes(bts)))
+            seq += [(f_, o_, 10000 + n_, b_) for n_, (f_, o_, b_) in enumerate(extra)]
+            seq.sort(key=lambda x: x[:3])
+            out, cur = b"", 1
+            for f_, _, _, b_ in seq:
+                if f_ != cur:
+                    out += at(f_)
+                    cur = f_
+                out += b_
+            scripts[name] = out + END
+            log.append(f"| {name} | - | spin-ball model | body shown all through | ball from f{extra[0][0]} to f{extra[1][0]} |")
         pointers = {}
         tb0, ta0 = action_table(bytearray(open(tmp_pl, "rb").read()), tmp_pl)
         print("Falcon voice IDs pointed at Sonic's bank:", remap_voices(tmp_pl, tb0, sa.load(tmp_pl)))
@@ -599,6 +896,8 @@ if __name__ == "__main__":
                 print("prepend skipped (script has other jumps):", name)
         install_scripts(tmp_pl, pl_out, scripts, pointers)
         os.remove(tmp_pl)
+        _g = next(a_ for a_ in A if a_.actions[0] == "Guard")
+        print("shield pose written:", write_shield_pose(pl_out, _g.solved[0][1]), "joints (was Captain Falcon's full-size guard pose)")
         with open(report, "w") as f:
             f.write("# v19 moves\n\n## New attacks (script written from scratch; game frames)\n\n")
             f.write("| Move | Actions | Total | IASA | Hit frames | Damage | Angle | BKB | KBG | Set KB | Size | Bone |\n|---|---|---|---|---|---|---|---|---|---|---|---|\n")

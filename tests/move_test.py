@@ -125,6 +125,29 @@ if "--faceshot" in sys.argv:
              ("fsmash 24", fsmash, 24.0), ("homing 40", sp(.5, .5), 40.0), ("homing miss", sp(.5, .5), 82.0),
              ("down b jump", downb_jump, 60.0, 190), ("down b early jump", downb_early, 60.0), ("up b", sp(.5, 1), 20.0), ("up b side", upb_side, 60.0)]
     SHOTS = {"crouch": (30,), "fsmash face": (16,), "dtilt 12": (15, 20), "up b": (5, 14), "up b side": (14,)}
+if "--shieldshots" in sys.argv:
+    # 5th element: inputs for Fox (P2) on the k-th frame, e.g. a down smash into Sonic's shield
+    def hold_r(n):
+        def f(c, k):
+            if k < n: c.press_button(B.BUTTON_R)
+        return f
+    def fox_dsmash(at):
+        def f(c2, k):
+            if at <= k < at + 3: c2.tilt_analog(CST, .5, 0)
+        return f
+    def spotdodge(c, k):
+        if k < 12: c.press_button(B.BUTTON_R)
+        if 5 <= k < 9: c.tilt_analog(MAIN, .5, 0)
+    def roll(c, k):
+        if k < 12: c.press_button(B.BUTTON_R)
+        if 5 <= k < 9: c.tilt_analog(MAIN, 1, .5)
+    def airdodge(c, k):
+        if k < 2: c.press_button(B.BUTTON_X)
+        if 9 <= k < 11: c.press_button(B.BUTTON_R)
+    MOVES = [("shield hit", hold_r(80), 10.0, 110, fox_dsmash(20)), ("spot dodge", spotdodge, 16.0), ("roll", roll, 24.0),
+             ("air dodge", airdodge, 24.0), ("homing 40", sp(.5, .5), 40.0, 120), ("homing miss", sp(.5, .5), 82.0, 120)]
+    SHOTS = {"shield hit": (5, 16, 40, 70, 86, 94), "spot dodge": (12, 20), "roll": (16, 34), "air dodge": (16, 24),
+             "homing miss": (20, 34, 50)}
 if "--spinshots" in sys.argv:
     MOVES = [("spin dash charged", sp(1, .5, hold=40), 60.0), ("nair", air(None, None), 20.0), ("homing 40", sp(.5, .5), 40.0)]
     SHOTS = {"spin dash charged": (4, 14, 30, 46, 52, 90), "nair": (5, 12, 18, 40), "homing 40": (6, 30)}
@@ -159,7 +182,8 @@ def main():
             dur = MOVES[mi][3] if len(MOVES[mi]) > 3 else 110
             dx = float(b.position.x - a.position.x)
             rows.append([frames, name, phase, k, act, a.action_frame, round(float(a.position.x), 2), round(dx, 2), b.percent, bact])
-            c.release_all()
+            if not (phase == "move" and MOVES[mi][0] == "shield hit" and 1 <= k < 80):
+                c.release_all()      # (a release + press of R in one frame sometimes dropped the shield, so R is just left held)
             c2 = r.s.c2
             c2.release_all()
             fox_x = float(b.position.x)
@@ -188,6 +212,8 @@ def main():
                     cur = {"move": name, "dist": round(dx, 2), "pct0": b.percent, "hits": [], "actions": []}
             elif phase == "move":
                 fn(c, k)
+                if len(MOVES[mi]) > 4:
+                    MOVES[mi][4](c2, k)
                 if k in SHOTS.get(name, ()) if isinstance(SHOTS.get(name), tuple) else SHOTS.get(name) == k:
                     print("capture", name, r.s.capture_game(f"{prefix}_{name.replace(' ', '_')}_{k}.png"), flush=True)
                 px, py = float(a.position.x), float(a.position.y)
