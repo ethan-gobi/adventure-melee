@@ -490,6 +490,28 @@ for k in range(IN):
 make_dobj(icorn, flat((255, 255, 225)), amb=255)
 print(f"  dobj {dobj_count - 1:2}: Insta-Shield, {len(icorn) // 3} triangles")
 
+# ---- 26: eyelids (v64). The eye whites again, lifted in front of the irises, in the fur blue with a dark lash line along
+# the bottom edge. Hidden normally; the fighter code shows them for a few frames to blink and keeps them shut while he is
+# asleep, dizzy, flinching or knocked down (visibility group 4).
+_HEAD = (38, 39, 40, 41)
+_ecs = [c for c in groups[next(k for k in groups if k[0] == 'stx_eye00')] if c["bone"] in _HEAD]
+_ewp = np.array([(W[c["bone"]] @ np.append(c["pl"], 1.0))[:3] for c in _ecs])
+_epiv = _ewp.mean(axis=0) + np.array([0.0, 0.0, -1.3])
+_y0, _y1 = _ewp[:, 1].min(), _ewp[:, 1].max()
+lid = []
+for c, p_ in zip(_ecs, _ewp):
+    o = (p_ - _epiv) / np.linalg.norm(p_ - _epiv)
+    q = p_ + 0.16 * o                                   # irises sit 0.06 out, the lids just in front of them
+    lid.append(((np.linalg.inv(W[c["bone"]]) @ np.append(q, 1.0))[:3], W[c["bone"]][:3, :3].T @ o,
+                (0.5, 0.05 + 0.9 * (_y1 - p_[1]) / (_y1 - _y0)), c["bone"]))
+_fur = np.array(Image.open(os.path.join(tex_dir, "stx_btest1.png")).convert("RGB"), dtype=float).reshape(-1, 3).mean(axis=0)
+ltex = np.zeros((16, 8, 4), dtype=np.uint8)
+ltex[..., :3] = [int(_fur[2]), int(_fur[1]), int(_fur[0])]      # BGR
+ltex[14:, :, :3] = [70, 20, 10]                                  # lash line (dark navy) along the bottom of the lid
+ltex[..., 3] = 255
+make_dobj(lid, ltex)
+print(f"  dobj {dobj_count - 1:2}: eyelids, {len(lid) // 3} triangles, fur colour {tuple(int(x) for x in _fur)}")
+
 gen.SaveChanges()
 # v32: draw both sides of every polygon. The generator's CULLFRONT flag with these windings made the game draw only
 # the far side of each part (hollow face from the front, soles visible through the shoes).

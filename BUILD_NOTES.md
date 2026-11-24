@@ -727,3 +727,15 @@ User: "add more endlag to neutral b", "fix his model when shielding ... somethin
 - New tools: `scripts/anim_sheet.py` (contact sheet of any stored animation), `scripts/package_build.py`, `tests/ledge_test.py`, `tests/knock_test.py`, `tests/face_test.py`, `tests/bone_probe.py`. Test inputs are now flushed every frame (un-flushed inputs arrived late).
 
 Tests v63: loads, shield/dodge/roll/Homing test OK (same Homing numbers as v62). Not verified / to do next: get-up attack and roll options in `knock_test.py` (v61 run only stood up, inputs were not flushed then); item animations in game; sleep; the on-hit Homing Attack total may now be too slow at low percent.
+
+## v64: blinking eyes, higher consecutive bounces, get-ups verified (2026-11-23)
+
+File: `builds/Melee - Sonic v64.iso` (only build kept; v63 deleted). Package `work/sonic_package_v64.zip`, model `work/v19/PlSnNr_v64.dat` (27 parts), fighter code `work/v19/ftFunction_v64.dat`. Animations unchanged from v62/v63 (`PlSnAJ_v62.dat`).
+
+- Verified on v63 first (`tests/knock_test.py`, `test_logs/v63_kn_*.png`): get-up attack from his back (the windmill, GROUND_ATTACK_UP 49 frames), get-up roll back (spin ball, 35 frames), knockdown bounce and lying, grabbed pose. The earlier runs only ever stood up because the test's inputs were sent while it was still catching up after a capture; the option is now pressed 45 frames into lying.
+- Eyelids (new model part 26, visibility group 4; `build_sonic_costume_ball.py`, `patch_ball_sets.py` now writes 5 groups): the eye whites copied 0.16 in front, fur blue with a dark lash line. Fighter code (`OnFrame`): a 5-frame blink every 170 frames; eyes shut while asleep (states 297-299), dizzy (211), flinching (75-91) and knocked down (183-185, 191-193); never while the spin ball is showing. Seen in game v64 (`test_logs/v64_kn_lie*.png`: shut while lying and on the hit pose, open while grabbed and standing). The idle blink itself was not caught on a capture.
+- Down B in the air (Bounce Attack, SA2 Bounce Bracelet), from -> to: rebound speed 3.0 every time -> 3.0, then 3.45, then 3.9 for each further bounce in a row without landing (the count clears when he stands on the floor). Test v64 (`tests/bounce_test.py`): rebound peaks 28.4, 36.5, 44.6, 44.6 units.
+- Tests v64: knockdown/grab test and bounce test ran full matches without a crash. The shield/dodge run landed on another stage because the test's stage picker missed (its captures still show the ball centred in the bubble, the spot dodge ball with the Insta-Shield and the roll ball); Homing Attack numbers were not re-measured on v64 (code for it unchanged since v62).
+
+Not verified: face-down knockdown set and its get-up attack, get-up roll forward, sleep, item animations, wall techs (offline previews only); the blink timing by eye.
+

@@ -47,6 +47,10 @@
 #define BOUNCE_ACCEL 0.45f
 #define BOUNCE_MAX -4.6f
 #define BOUNCE_REBOUND 3.0f
+#define BOUNCE_REBOUND_STEP 0.45f // v64: each bounce in a row without landing rebounds higher (SA2 Bounce Bracelet): 3.0, 3.45, 3.9
+#define BOUNCE_REBOUND_STEPS 2
+#define BLINK_PERIOD 170 // v64: frames between blinks
+#define BLINK_LEN 5
 
 #define INL static inline __attribute__((always_inline))
 typedef union { int i; float f; } IF; // to keep a float in an int state variable
@@ -494,7 +498,11 @@ void Bounce_Land(GOBJ *fighter)
         return;
     }
     Fighter_SetAirborne(fd);
-    fd->phys.self_vel.Y = BOUNCE_REBOUND;
+    int n = fd->fighter_var.ft_var3; // bounces in a row so far; cleared in OnFrame once he stands on the floor
+    if (n > BOUNCE_REBOUND_STEPS)
+        n = BOUNCE_REBOUND_STEPS;
+    fd->phys.self_vel.Y = BOUNCE_REBOUND + BOUNCE_REBOUND_STEP * (float)n;
+    fd->fighter_var.ft_var3++;
     fd->state_var.state_var2 = 1;
 }
 
@@ -521,6 +529,19 @@ void OnFrame(GOBJ *fighter)
         fd->fighter_var.ft_var1 = 0;
         Fighter_SetVisGroupCurrent(fighter, 0, 0);
     }
+    // v64: Bounce Attack chain ends once he is on the floor in any other state
+    if (fd->phys.air_state == 0 && s != ST_BOUNCE)
+        fd->fighter_var.ft_var3 = 0;
+    // v64: eyelids (visibility group 4, set 1). A short blink every BLINK_PERIOD frames; shut while asleep (297-299),
+    // dizzy after a shield break (211), flinching from a hit (75-91) and knocked down (183-185, 191-193).
+    // Only while the normal body is showing (group 0, set 0): never on the spin ball.
+    fd->fighter_var.ft_var2++;
+    int shut = (fd->fighter_var.ft_var2 % BLINK_PERIOD) < BLINK_LEN;
+    if ((s >= 297 && s <= 299) || s == 211 || (s >= 75 && s <= 91) || (s >= 183 && s <= 185) || (s >= 191 && s <= 193))
+        shut = 1;
+    if (fd->dobj_toggle[0].index != 0)
+        shut = 0;
+    Fighter_SetVisGroupCurrent(fighter, 4, shut ? 1 : 0);
 }
 
 // ---------------------------------------------------------------- state table (state 341 + index)

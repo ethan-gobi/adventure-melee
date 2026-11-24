@@ -17,7 +17,7 @@ B = enums.Button
 MAIN, CSTICK = B.BUTTON_MAIN, B.BUTTON_C
 OPTIONS = [("stand", lambda c: c.tilt_analog(MAIN, 0.5, 1.0)), ("attack", lambda c: c.press_button(B.BUTTON_A)),
            ("rollF", lambda c: c.tilt_analog(MAIN, 1.0, 0.5)), ("rollB", lambda c: c.tilt_analog(MAIN, 0.0, 0.5))]
-SHOTS = (4, 10, 16, 20, 24, 28, 34)
+SHOTS = (8, 19, 28, 40)
 LYING = ("LYING_GROUND_UP", "LYING_GROUND_DOWN")
 HELD = ("GRAB_PULL", "GRABBED", "GRAB_PUMMELED", "GRAB_PULLING_HIGH", "GRABBED_WAIT_HIGH", "GRAB_NECK", "GRAB_FOOT")
 NEUTRAL = ("STANDING", "WALK_SLOW", "WALK_MIDDLE", "WALK_FAST", "TURNING", "LANDING", "CROUCH_END")
@@ -67,7 +67,7 @@ def main():
                     cur = {"lie": act, "name": OPTIONS[oi % len(OPTIONS)][0], "pct": int(a.percent), "actions": []}
                 if k == 12:
                     print("capture lying", act, r.s.capture_game(f"{prefix}_lie{len(done)}_{act[-2:]}.png"), flush=True)
-                if 18 <= k < 21:
+                if 45 <= k < 51:           # well after the capture: while the loop catches up on queued frames, inputs are missed
                     OPTIONS[oi % len(OPTIONS)][1](c)
                 k += 1
             elif phase == "lying":
