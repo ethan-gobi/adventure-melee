@@ -513,10 +513,18 @@ move("ForwardTilt", ["AttackS3Hi", "AttackS3HiS", "AttackS3S", "AttackS3LwS", "A
 
 UTF = dict(ground=0, pivot=(0, 2.0, 0), thighL=(0.12, -1, 0.3), shinL=(0.08, -1, 0.12), thighR=(-0.12, -1, 0.3), shinR=(-0.08, -1, 0.12), footL=40, footR=40,
            armL=(1, -0.3, 0.2), foreL=(1, 0.1, 0.3), armR=(-1, -0.3, 0.2), foreR=(-1, 0.1, 0.3))
+# up tilt (v65): Insta-Shield flash overhead (Sonic 3). Until v64 this was the same flip kick as the up air. He rises onto
+# his toes and pirouettes once with his right arm up; the white crescent (model part 25, on the hips) whirls with the turn
+# and sweeps a dome over his head. Hit frames, angle and knockback are the old ones; the hitboxes moved from the feet of the
+# flip to a sphere above his head and a smaller one in front of his chest.
+IS_W = P(S, root=(6, -40, 0), chest=(6, -20, 0), head=(-10, 20, 0), armR=(-0.7, -0.6, -0.5), foreR=(-0.5, 0.2, -0.6), armL=(0.6, -0.6, 0.5), foreL=(0.2, 0.3, 0.9),
+         thighL=(0.12, -1, 0.3), shinL=(0.08, -1, -0.25), thighR=(-0.12, -1, -0.1), shinR=(-0.08, -1, -0.4))
+_IS = dict(chest=(-8, 0, 0), head=(-25, 0, 0), armR=(-0.2, 1, 0.15), foreR=(-0.05, 1, 0.05), armL=(0.9, -0.6, -0.2), foreL=(0.8, -0.3, 0.3),
+           thighL=(0.08, -1, 0.05), shinL=(0.05, -1, -0.05), thighR=(-0.08, -1, 0.0), shinR=(-0.05, -1, -0.1), footL=35, footR=35)
+IS_T = lambda yaw: P(S, root=(-4, yaw, 0), **_IS)      # noqa: E731
 move("UpTilt", "AttackHi3", 28,
-     [(0, S), (3, P(CROUCH, root=(-5, 0, 0))), (5, P(S, root=(-80, 0, 0), hip=(0, 1.5, 0), **UTF), "in"), (10, P(S, root=(-225, 0, 0), hip=(0, 3.0, 0), **UTF), "lin"),
-      (15, tuck(-320, pivot=(0, 2.0, 0), hip=(0, 1.5, 0)), "lin"), (20, P(LAND, root=(-360, 0, 0)), "lin"), (28, P(S, root=(-360, 0, 0)))],
-     [(6, 10, [Hit(0, 16, 8, 2.6, 92, 35, 95, off=(1.6, 0, 0)), Hit(1, 10, 8, 2.6, 92, 35, 95, off=(1.6, 0, 0)), Hit(2, 14, 7, 2.0, 92, 35, 95, off=(2.4, 0, 0))])], iasa=24)
+     [(0, S), (3, IS_W), (5, IS_T(0), "out"), (11, IS_T(360), "lin"), (16, P(S, root=(4, 360, 0), chest=(8, 0, 0))), (28, P(S, root=(0, 360, 0)))],
+     [(6, 10, [Hit(0, 2, 8, 4.4, 92, 35, 95, off=(0, 7.0, 1.2)), Hit(1, 2, 7, 3.0, 92, 35, 95, off=(0, 3.0, 5.5))])], iasa=24, insta=(5, 12))
 
 # down tilt (v54): Somersault (SA2). From the duck he rolls forward along the floor as a ball (7 units), then pops a low kick
 # out of the roll that launches upward for combos.
@@ -558,9 +566,23 @@ move("UpSmash", "AttackHi4", 48,
 
 SPLIT = P(root=(0, 0, 0), chest=(25, 0, 0), head=(-20, 0, 0), thighL=(0.05, -0.16, 1), shinL=(0.05, -0.1, 1), thighR=(-0.05, -0.16, -1), shinR=(-0.05, -0.1, -1),
           footL=-15, footR=40, armL=(0.6, -1, 0.3), foreL=(0.3, -1, 0.2), armR=(-0.6, -1, 0.3), foreR=(-0.3, -1, 0.2))
-move("DownSmash", "AttackLw4", 44, [(0, S), (4, CROUCH), (7, SPLIT, "out"), (10, SPLIT), (18, CROUCH), (44, S)],
+# down smash (v65): breakdance windmill. He drops onto his shoulders and spins a full turn with his legs split (the pose of the
+# get-up attack). The early hit is the old split kick's (same frames and numbers, legs pointing forward and back); new late
+# hit (f11-17, weaker) as the legs come round the other way; it follows straight on, so it cannot hit someone the early hit
+# already hit. SPLIT (the old pose) is kept above for reference.
+# The get-up attack's pose has one leg up and one forward; here the legs are a flat split, left foot 6.7 in front and right
+# foot 4.2 behind at hip height on the early hit, so it covers both sides at once like the old split kick did.
+_WMF = dict(ground=0, floor=1, chest=(30, 0, 0), head=(40, 0, 0), footL=-10, footR=-10,
+            armL=(1, -0.2, -0.4), foreL=(0.6, -0.8, -0.3), armR=(-1, -0.2, -0.4), foreR=(-0.6, -0.8, -0.3),
+            thighL=(0.1, -1, -0.17), shinL=(0.05, -1, -0.1), thighR=(-0.1, 1, 0.17), shinR=(-0.05, 1, 0.25))
+WMF = lambda yaw: P(root=(-100, yaw, 0), **_WMF)      # noqa: E731
+move("DownSmash", "AttackLw4", 44,
+     [(0, S), (4, P(TUCK, root=(-60, -80, 0), floor=1)), (7, WMF(0), "lin"), (9, WMF(40), "lin"), (13.5, WMF(180), "lin"), (16, WMF(255), "lin"),
+      (20, WMF(360), "out"), (27, P(CRF, root=(30, 360, 0))), (44, P(S, root=(0, 360, 0)))],
      [(8, 10, [Hit(0, 10, 13, 2.6, 30, 30, 90, off=(1.6, 0, 0)), Hit(1, 8, 12, 2.0, 30, 30, 90, off=(2.4, 0, 0)),
-               Hit(2, 16, 11, 2.6, 30, 30, 90, off=(1.6, 0, 0)), Hit(3, 14, 10, 2.0, 30, 30, 90, off=(2.4, 0, 0))])], charge=5, iasa=40)
+               Hit(2, 16, 11, 2.6, 30, 30, 90, off=(1.6, 0, 0)), Hit(3, 14, 10, 2.0, 30, 30, 90, off=(2.4, 0, 0))]),
+      (11, 17, [Hit(0, 10, 8, 2.4, 30, 20, 80, off=(1.6, 0, 0)), Hit(1, 8, 7, 1.9, 30, 20, 80, off=(2.4, 0, 0)),
+                Hit(2, 16, 8, 2.4, 30, 20, 80, off=(1.6, 0, 0)), Hit(3, 14, 7, 1.9, 30, 20, 80, off=(2.4, 0, 0))])], charge=5, iasa=40)
 
 # ------------------------------------------------------------------ aerials
 move("NeutralAir", "AttackAirN", 39, [(0, FALL), (3, tuck(60)), (27, tuck(780), "lin"), (33, P(FALL, root=(720, 0, 0)), "lin"), (39, P(FALL, root=(720, 0, 0)))],
