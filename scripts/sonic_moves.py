@@ -4,6 +4,7 @@ Usage: python sonic_moves.py preview <out dir>
        python sonic_moves.py build <PlSnAJ in> <PlSn.dat in> <PlSnAJ out> <PlSn.dat out> <changes.md>
 Key frames are animation frames (0-based); hitbox frames are game frames (1-based), so game frame f shows animation frame f-1.
 """
+import json
 import math
 import os
 import struct
@@ -683,6 +684,17 @@ move("LightDashCharge", "SpecialAirSStart", 80, [(0, S), (6, LD_READY), (18, P(L
 move("LightDash", "SpecialAirS", 45, [(0, P(FLY, root=(60, 0, 0))), (2, FLY, "out"), (14, P(FLY, root=(84, 0, 0))), (22, P(BRAKE, ground=0.0)), (45, P(S, ground=0.0))],
      [(1, 4, [Hit(0, 2, 16, 3.6, 361, 40, 100, off=(0, 1.5, 1.5))]), (5, 14, [Hit(0, 2, 5, 3.2, 361, 20, 60, off=(0, 1.5, 1.0))])], trail=(1, 17),
      prop=lambda f, W: ((W[2][0, 3], W[2][1, 3] + 1.2, W[2][2, 3] - 1.0), 0))
+# v69: air up B = Tails carry (Sonic 3). Sonic hangs from Tails' hands (Tails is model parts 27-42, shown by the fighter
+# code in state 351), arms straight up, legs swinging; Tails' two tails (bone 62) spin round their base like a propeller.
+_TJ = json.load(open("C:/adventure-melee/work/v19/PlSnNr_v69_tails.json")) if os.path.exists("C:/adventure-melee/work/v19/PlSnNr_v69_tails.json") else {"pivot": [0, 20.5, -3.0], "hands": [0, 15.2, 0.6]}
+_TH = np.array(_TJ["hands"])
+_HANG = P(ground=0, hip=(0, 1.5, 0), chest=(-4, 0, 0), head=(-20, 0, 0), footL=40, footR=40,
+          thighL=(0.12, -1, 0.15), shinL=(0.07, -1, -0.2), thighR=(-0.12, -1, -0.05), shinR=(-0.07, -1, -0.35))
+CARRY = reach(reach(_HANG, "L", _TH + np.array([0.7, 0, 0]), pole=(1, 0, -0.3)), "R", _TH + np.array([-0.7, 0, 0]), pole=(-1, 0, -0.3))
+CARRY2 = reach(reach(P(_HANG, thighL=(0.12, -1, -0.15), shinL=(0.07, -1, -0.45), thighR=(-0.12, -1, 0.2), shinR=(-0.07, -1, -0.1)),
+                     "L", _TH + np.array([0.7, 0, 0]), pole=(1, 0, -0.3)), "R", _TH + np.array([-0.7, 0, 0]), pole=(-1, 0, -0.3))
+move("TailsCarry", "SpecialHiCatch", 70, [(0, CARRY), (12, CARRY2), (24, CARRY), (36, CARRY2), (48, CARRY), (60, CARRY2), (70, CARRY)], [],
+     prop=lambda f, W: (np.array(_TJ["pivot"]), f * 47.0))
 move("BounceAttack", "SpecialAirLw", 60, [(0, FALL), (4, tuck(90)), (60, tuck(1770), "lin")],
      [(3, 60, [ball(9, 70, 30, 80)])], ball=(5, 0))
 

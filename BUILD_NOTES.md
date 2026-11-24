@@ -790,3 +790,16 @@ File: `builds/Melee - Sonic v68.iso` (only build kept; v66, v67 deleted). Packag
 - Test v68: loads into a match; up smash f10 17%, grab catches on f6.
 Still open: out-of-memory crash after ~8 min in Training (needs a soak test); down air and throws unchecked in game; Tails-carry recovery not started; Falcon emblem on the portrait panel.
 
+## v69: Tails carries Sonic (air up B) (2026-11-24)
+
+File: `builds/Melee - Sonic v69.iso` (only build kept; v68 deleted). Package `work/sonic_package_v69.zip`, model `work/v19/PlSnNr_v69.dat` (43 parts, 918,861 bytes, was 845,293), animations `PlSnAJ_v69.dat`, fighter code `ftFunction_v69.dat`.
+User: "make tails pick him up for his recovery", "wheres tails carry on on your own".
+
+- Air up B, from -> to: Super Peel-Out in the air (rev 8 frames, dash 3.3 for 12 frames, 6% hitbox f9-29, then helpless) -> Tails carry (Sonic 3): Tails holds Sonic's hands and flies him up for 60 frames (no rise for 8 frames while Tails grabs him, rise speed 1.0 for frames 8-40, fading to 0.2 by frame 60), steerable sideways (stick x 0.08 per frame, max 0.9), then Tails lets go and Sonic falls helpless (same helpless fall and 15-frame landing lag as the Peel-Out). No hitbox. Can grab ledges. Ground up B is still the Peel-Out.
+- New fighter state 351 (`fighter_code/sonic.c`, `Tails_Anim`/`Tails_Phys`, animation SpecialHiCatch = 309, unused by Sonic before). OnFrame shows visibility group 5 (Tails) only in this state.
+- Tails model: his SA1 Dreamcast model from the user's files (`extract/sa1/figure/miles/models/m_kihon3_miles.nja.sa1mdl`, textures unpacked from `MILES.PRS` with ArchiveTool to `extract/sa1_tex/MILES`), posed on frame 4 of his SA1 fly-up animation in Blender (`scripts/export_tails_pose.py`, preview `scripts/preview_parts.py`), placed so his hands are at (0, 15.2, 0.6) above Sonic's head. 13 body parts on bone 1, 3 tail parts on bone 62 spun round their base (47 degrees per frame) by the animation. Textures resized to 64x64 or smaller.
+- Sonic's pose: hanging, both arms IK-reached to Tails' hands (checked: hands land exactly on the targets), legs swinging every 12 frames.
+- Test v69 (`tests/tails_test.py`): jump, up B at frame 22: rises from 35.9 to 80.3 (44 units) over 60 frames, then fall special and landing; captures `test_logs/v69_tails_*.png` show Tails above him holding his hands.
+
+Not verified: the tail spin is hard to see in the captures; ledge grab during the carry; how it looks from the front; memory use with the bigger model (the 8-minute out-of-memory crash is still open).
+

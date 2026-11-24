@@ -512,6 +512,55 @@ ltex[..., 3] = 255
 make_dobj(lid, ltex)
 print(f"  dobj {dobj_count - 1:2}: eyelids, {len(lid) // 3} triangles, fur colour {tuple(int(x) for x in _fur)}")
 
+# ---- 27+: Tails (v69), for the air up B: Tails flies down, grabs Sonic's hands and carries him up (Sonic 3). His SA1 model
+# (the user's files), posed on frame 4 of his SA1 fly-up animation in Blender (scripts/export_tails_pose.py), placed so his
+# hands meet above Sonic's head. Body parts on bone 1 (moves with Sonic, does not tilt with him); the two tails on bone 62
+# around their base so the up B animation can spin them like a propeller. One part per texture (32x32 or 64x64).
+TAILS_JSON, TAILS_TEX = "C:/adventure-melee/work/tails_fly.json", "C:/adventure-melee/extract/sa1_tex/MILES"
+TAILS_HANDS = np.array([0.0, 15.2, 0.6])          # where his hands meet (fighter space)
+tails_counts = [0, 0]
+if os.path.exists(TAILS_JSON):
+    td = json.load(open(TAILS_JSON))
+    tri_all = []
+    for part_ in td["parts"]:
+        imgs_ = {(td["materials"].get(t_["m"]) or {}).get("image") for t_ in part_["tris"]}
+        is_tail = "mtx_tail" in imgs_
+        for t_ in part_["tris"]:
+            img_ = (td["materials"].get(t_["m"]) or {}).get("image") or "mtx_white"
+            tri_all.append((is_tail, img_, [(K * S(v_["p"]), S(v_["n"]), (v_["uv"][0], 1.0 - v_["uv"][1])) for v_ in t_["v"]]))
+    hands = np.array([q_[0] for tl, im, cs in tri_all if im == "s_testhand" for q_ in cs])
+    off = TAILS_HANDS - hands.mean(axis=0)
+    tailpts = np.array([q_[0] + off for tl, im, cs in tri_all if tl for q_ in cs])
+    pivot = np.array([tailpts[:, 0].mean(), tailpts[:, 1].min(), tailpts[:, 2].mean()])
+    json.dump({"pivot": pivot.tolist(), "hands": TAILS_HANDS.tolist()}, open(os.path.splitext(out_dat)[0] + "_tails.json", "w"))
+    W1i, W62i = np.linalg.inv(W[1]), np.linalg.inv(W[62])
+    for want_tail in (False, True):
+        byimg = {}
+        for tl, im, cs in tri_all:
+            if tl == want_tail:
+                byimg.setdefault(im, []).append(cs)
+        for im, tris_ in sorted(byimg.items()):
+            corners_ = []
+            for cs in tris_:
+                for pq, nq, uvq in cs:
+                    pw_ = pq + off
+                    if want_tail:
+                        pl_, bone_ = (W62i @ np.append(pw_ - pivot + W[62][:3, 3], 1.0))[:3], 62
+                    else:
+                        pl_, bone_ = (W1i @ np.append(pw_, 1.0))[:3], 1
+                    corners_.append((pl_, nq / (np.linalg.norm(nq) + 1e-9), uvq, bone_))
+            src_ = os.path.join(TAILS_TEX, im + ".png")
+            timg = Image.open(src_).convert("RGB") if os.path.exists(src_) else Image.new("RGB", (8, 8), (255, 255, 255))
+            ts_ = 64 if max(timg.size) >= 64 else max(8, min(timg.size))
+            tb_ = np.array(timg.resize((ts_, ts_), Image.BICUBIC).convert("RGBA"), dtype=np.uint8)[..., [2, 1, 0, 3]].copy()
+            tb_[..., 3] = 255
+            dd_ = make_dobj(corners_, tb_)
+            dd_.Mobj.Textures.WrapS = GXWrapMode.REPEAT
+            dd_.Mobj.Textures.WrapT = GXWrapMode.REPEAT
+            tails_counts[want_tail] += 1
+    print(f"  dobjs {dobj_count - sum(tails_counts):2}-{dobj_count - 1}: Tails, {tails_counts[0]} body + {tails_counts[1]} tail parts; tail pivot {np.round(pivot, 2)}")
+json.dump({"tails_parts": sum(tails_counts)}, open(os.path.splitext(out_dat)[0] + "_extra.json", "w"))
+
 gen.SaveChanges()
 # v32: draw both sides of every polygon. The generator's CULLFRONT flag with these windings made the game draw only
 # the far side of each part (hollow face from the front, soles visible through the shoes).

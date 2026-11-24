@@ -19,6 +19,10 @@
 #define LD_SPEED 3.9f
 #define LD_FRAMES 12
 #define LD_END 30
+#define ST_TAILS 351 // v69: air up B, Tails carries Sonic up (anim SpecialHiCatch, 309)
+#define TAILS_FRAMES 60   // carried this long, then Tails lets go: helpless fall
+#define TAILS_RISE 1.0f   // rising speed for frames 8-40, then it fades to 0.2 by the end
+#define TAILS_DRIFT 0.9f  // max sideways speed, steered with the stick
 #define ST_LSD_SIDE 346 // same move as 344 with the head-first flying pose, used when the dash is mostly sideways
 
 #define HOMING_RANGE 75.0f
@@ -378,7 +382,41 @@ INL void LsdStart(GOBJ *fighter)
 }
 
 void SpecialHi(GOBJ *fighter) { LsdStart(fighter); }
-void SpecialAirHi(GOBJ *fighter) { LsdStart(fighter); }
+void SpecialAirHi(GOBJ *fighter)
+{ // v69: Tails carry (Sonic 3). Ground up B is still the Peel-Out.
+    FighterData *fd = fighter->userdata;
+    EnterState(fighter, ST_TAILS);
+    fd->phys.self_vel.X = fd->phys.self_vel.X * 0.5f;
+    fd->phys.self_vel.Y = 0.0f;
+}
+
+void Tails_Anim(GOBJ *fighter)
+{
+    FighterData *fd = fighter->userdata;
+    fd->state_var.state_var1++;
+    if (fd->state_var.state_var1 > TAILS_FRAMES)
+        Fighter_EnterSpecialFall(fighter, 1, 1, 0, 1.0f, 15.0f); // Tails lets go
+}
+
+void Tails_Phys(GOBJ *fighter)
+{
+    FighterData *fd = fighter->userdata;
+    int t = fd->state_var.state_var1;
+    float vy;
+    if (t < 8)
+        vy = 0.0f; // Tails swoops in and grabs his hands
+    else if (t < 40)
+        vy = TAILS_RISE;
+    else
+        vy = TAILS_RISE - (TAILS_RISE - 0.2f) * (float)(t - 40) / (float)(TAILS_FRAMES - 40);
+    fd->phys.self_vel.Y = vy;
+    float vx = fd->phys.self_vel.X * 0.96f + fd->input.lstick.X * 0.08f;
+    if (vx > TAILS_DRIFT)
+        vx = TAILS_DRIFT;
+    if (vx < -TAILS_DRIFT)
+        vx = -TAILS_DRIFT;
+    fd->phys.self_vel.X = vx;
+}
 
 void Lsd_Anim(GOBJ *fighter)
 {
@@ -542,6 +580,7 @@ void OnFrame(GOBJ *fighter)
     if (fd->dobj_toggle[0].index != 0)
         shut = 0;
     Fighter_SetVisGroupCurrent(fighter, 4, shut ? 1 : 0);
+    Fighter_SetVisGroupCurrent(fighter, 5, s == ST_TAILS ? 1 : 0); // v69: Tails only while he carries Sonic
 }
 
 // ---------------------------------------------------------------- state table (state 341 + index)
@@ -556,4 +595,5 @@ __attribute__((used)) static struct FtState move_logic[] = {
     {305, 0x341012, 0x13, 0x0, LdCharge_Anim, 0, LdChargeAir_Phys, Air_Coll, Fighter_UpdateCameraBox}, // 348 Light Dash pause, air
     {306, 0x341012, 0x13, 0x0, LdGround_Anim, 0, LdGround_Phys, Ground_Coll, Fighter_UpdateCameraBox}, // 349 Light Dash on the floor (anim SpecialAirS)
     {306, 0x341012, 0x13, 0x0, LdAir_Anim, 0, LdAir_Phys, Lsd_Coll, Fighter_UpdateCameraBox},          // 350 Light Dash in the air
+    {309, 0x340613, 0x14, 0x0, Tails_Anim, 0, Tails_Phys, Lsd_Coll, Fighter_UpdateCameraBox},         // 351 Tails carry (anim SpecialHiCatch)
 };
