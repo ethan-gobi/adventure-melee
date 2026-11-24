@@ -773,3 +773,11 @@ User: "fix down air, down tilt teleports back, the crouch looks super weird, giv
 
 Not done: Tails carrying him as the recovery. Tails' SA1 model is in the user's files (`extract/sa1/figure/miles/models/m_kihon3_miles.nja.sa1mdl`, plus tail models and animations); it needs the model brought in as a new part and a new up B. Not verified in game: down tilt, down air, crouch, the throws, the new eyes.
 
+## v67: Sonic's own select-screen icon, portrait and stock icon (2026-11-24)
+
+File: `builds/Melee - Sonic v67.iso` (v66 kept until chat Claude checks v67). Package `work/sonic_package_v67.zip` = v66 with new pictures; gameplay identical to v66.
+User (via chat Claude): "give sonic his own icon". From -> to, all five costumes: select-screen grid icon Captain Falcon's face -> Sonic's head (the slot's image is 64x56; written as RGB5A3, was CI8; `build_iso.ps1 -IconPng`); portrait `csp.png` (136x188) and stock icon `stc.png` (24x24) Falcon's -> Sonic renders from his own model (`scripts/make_icons.py`, transparent background).
+Not verified in game yet (asked chat Claude in `.bridge/messages.md`). The 128x128 render is stretched to 64x56, so the head may look slightly squashed.
+
+Open from chat Claude's v66 report: an out-of-memory crash (HSD heap assert, memory.c line 52) after about 8 minutes in Training; jumping did not leave the ground for chat Claude (works in the test harness); down air and throws still unchecked. Down tilt stays in place (confirmed); crouch fine; eyes still show only a thin iris sliver from the side and the user finds them odd from the front.
+

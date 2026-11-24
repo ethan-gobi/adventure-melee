@@ -1,7 +1,7 @@
 # Builds a new versioned ISO: clean Melee copy + m-ex + the Sonic fighter package.
 # Usage: powershell -File build_iso.ps1 -Version v01 -Package C:\adventure-melee\work\sonic_package_v01.zip
 # Never overwrites an existing build and never touches base\Melee NTSC 1.02 clean.iso.
-param([Parameter(Mandatory)][string]$Version, [string]$Package, [switch]$NoFighter, [switch]$NoIcon, [string]$SoundBank)
+param([Parameter(Mandatory)][string]$Version, [string]$Package, [switch]$NoFighter, [switch]$NoIcon, [string]$SoundBank, [string]$IconPng)
 . C:\adventure-melee\scripts\mex_common.ps1
 $out = "C:\adventure-melee\builds\Melee - Sonic $Version.iso"
 if (Test-Path $out) { throw "Build already exists, refusing to overwrite: $out" }
@@ -92,6 +92,19 @@ try {
     "Roy icon at X=$($roy.X) Y=$($roy.Y) W=$($roy.Width);  Falcon icon at X=$($src.X) Y=$($src.Y)"
     $icon.X = $roy.X + 7.0; $icon.Y = $roy.Y
     $icon.StartX = $icon.X; $icon.StartY = $icon.Y
+    if ($IconPng) {    # v67: Sonic's own picture instead of Captain Falcon's, same size and format as the slot's image
+        Add-Type -AssemblyName System.Drawing
+        $td = $icon.Image.ImageData
+        $w = [int]$td.Width; $h = [int]$td.Height
+        $bmp = New-Object System.Drawing.Bitmap($w, $h, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+        $gr = [System.Drawing.Graphics]::FromImage($bmp); $gr.InterpolationMode = 'HighQualityBicubic'
+        $src0 = [System.Drawing.Image]::FromFile($IconPng); $gr.DrawImage($src0, 0, 0, $w, $h); $gr.Dispose(); $src0.Dispose()
+        $bd = $bmp.LockBits((New-Object System.Drawing.Rectangle(0, 0, $w, $h)), 'ReadOnly', [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+        $bytes = New-Object byte[] ($w * $h * 4); [System.Runtime.InteropServices.Marshal]::Copy($bd.Scan0, $bytes, 0, $bytes.Length); $bmp.UnlockBits($bd); $bmp.Dispose()
+        "icon image was $w x $h $($td.Format)"
+        $icon.Image.EncodeImageData($bytes, $w, $h, [HSDRaw.GX.GXTexFmt]::RGB5A3, [HSDRaw.GX.GXTlutFmt]::RGB5A3)
+        "icon image replaced from $IconPng"
+    }
     $icons.Add($icon.PSObject.BaseObject)
     "icons: $($icons.Count); Sonic icon at X=$($icon.X) Y=$($icon.Y)"
 
