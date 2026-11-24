@@ -217,24 +217,28 @@ show_ball("Passive", 1, 11)
 show_ball(["PassiveStandF", "PassiveStandB"], 1, 31)
 
 # ------------------------------------------------------------------ grab and throws (Falcon's scripts and timings; hit/release frames unchanged)
-REACH = P(root=(22, 0, 0), chest=(10, 0, 0), head=(-20, 0, 0), armL=(0.3, 0.0, 1), foreL=(0.1, 0.05, 1), armR=(-0.3, 0.0, 1), foreR=(-0.1, 0.05, 1),
-          thighL=(0.15, -1, 0.6), shinL=(0.1, -1, -0.2), thighR=(-0.15, -1, -0.3), shinR=(-0.1, -1, -0.6))
+GRAB_W = P(S, root=(-6, 0, 0), chest=(-4, 0, 0), armL=(0.6, -0.6, -0.5), foreL=(0.3, 0.2, 0.9), armR=(-0.6, -0.6, -0.5), foreR=(-0.3, 0.2, 0.9))
+REACH = P(root=(26, 0, 0), chest=(12, 0, 0), head=(-24, 0, 0), armL=(0.25, -0.05, 1), foreL=(0.05, 0.0, 1), armR=(-0.25, -0.05, 1), foreR=(-0.05, 0.0, 1),
+          thighL=(0.12, -1, 0.75), shinL=(0.08, -1, 0.05), thighR=(-0.12, -1, -0.55), shinR=(-0.08, -1, -0.5), footR=25)   # v66: lunge, front foot out
 HOLD = P(root=(6, 0, 0), chest=(6, 0, 0), armL=(0.4, -0.25, 1), foreL=(-0.15, 0.25, 1), armR=(-0.4, -0.25, 1), foreR=(0.15, 0.25, 1))
-anim("Catch", 30, [(0, S), (5, REACH, "out"), (9, REACH), (30, S)])
-anim("CatchDash", 40, [(0, P(S, root=(20, 0, 0))), (9, P(REACH, root=(32, 0, 0)), "out"), (14, REACH), (40, S)], keep_root=True)
+anim("Catch", 30, [(0, S), (3, GRAB_W), (6, REACH, "out"), (10, REACH), (30, S)])
+anim("CatchDash", 40, [(0, P(S, root=(20, 0, 0))), (4, P(GRAB_W, root=(14, 0, 0))), (9, P(REACH, root=(34, 0, 0), hip=(0, -1.5, 0)), "out"), (16, P(REACH, root=(30, 0, 0))), (40, S)], keep_root=True)
 anim("CatchWait", 30, [(0, HOLD), (15, P(HOLD, chest=(9, 0, 0))), (30, HOLD)])
 anim("CatchAttack", 24, [(0, HOLD), (3, P(HOLD, root=(-8, 0, 0), thighR=(-0.1, 0.35, 1), shinR=(-0.05, -1, 0.35)), "out"), (7, P(HOLD, root=(-8, 0, 0), thighR=(-0.1, 0.35, 1), shinR=(-0.05, -1, 0.35))), (24, HOLD)])
 anim("CatchCut", 30, [(0, HOLD), (6, P(HURT, root=(-14, 0, 0))), (30, S)], keep_root=True)
 PUNCH_L = P(S, root=(8, 0, 0), chest=(10, -40, 0), armL=(0.05, 0.1, 1), foreL=(-0.05, 0.1, 1), armR=(-0.5, -0.7, -0.6), foreR=(-0.4, -0.2, 0.7))
-anim("ThrowF", 40, [(0, HOLD), (6, P(HOLD, chest=(0, 45, 0), armL=(0.6, -0.4, -0.5), foreL=(0.4, 0.2, 0.6)), "io"), (10, PUNCH_L, "out"), (18, PUNCH_L), (40, S)], keep_root=True)
+anim("ThrowF", 40, [(0, HOLD), (5, P(CROUCH, root=(20, 0, 0))), (8, tuck(60, hip=BALL_HIP)), (18, tuck(780, hip=BALL_HIP), "lin"), (22, P(CROUCH, root=(780, 0, 0))), (40, P(S, root=(720, 0, 0)))], keep_root=True)
+show_ball("ThrowF", 9, 20)     # v66: rams them with the spin ball (was a punch)
 TB = P(S, root=(0, 95, -28), chest=(0, -10, 10), head=(0, -35, 10), thighL=(1, 0.06, 0), shinL=(1, 0.1, 0), footL=-5,
        thighR=(-0.15, -1, 0.1), shinR=(-0.1, -1, -0.25), armL=(1, -0.5, 0.2), foreL=(1, -0.3, 0.1), armR=(-0.7, -0.2, 0.6), foreR=(-0.2, 0.6, 0.7))
 anim("ThrowB", 50, [(0, HOLD), (7, P(HOLD, root=(0, 60, 0))), (11, TB, "out"), (20, P(TB, root=(0, 95, -24))), (32, P(S, root=(0, 60, 0))), (50, S)], keep_root=True)
 UPPER = P(S, root=(-8, 0, 0), chest=(-8, -30, 0), head=(-20, 0, 0), armL=(0.1, 1, 0.4), foreL=(0.0, 1, 0.2), armR=(-0.6, -0.8, -0.3), foreR=(-0.5, -0.4, 0.5))
-anim("ThrowHi", 44, [(0, HOLD), (6, P(CROUCH, armL=(0.4, -1, 0.5), foreL=(0.1, -0.5, 1))), (10, UPPER, "out"), (16, UPPER), (29, P(UPPER, root=(-4, 0, 0))), (44, S)], keep_root=True)
+anim("ThrowHi", 44, [(0, HOLD), (5, CROUCH), (8, tuck(-40)), (16, tuck(-580), "lin"), (24, P(CROUCH, root=(-720, 0, 0))), (44, P(S, root=(-720, 0, 0)))], keep_root=True)
+show_ball("ThrowHi", 9, 18)    # v66: spins up into them as a ball (was an uppercut)
 SLAM_UP = P(S, root=(-12, 0, 0), chest=(-10, 0, 0), armL=(0.3, 1, 0.3), foreL=(0.1, 1, 0.1), armR=(-0.3, 1, 0.3), foreR=(-0.1, 1, 0.1))
 SLAM_DN = P(CROUCH, root=(30, 0, 0), chest=(25, 0, 0), armL=(0.3, -0.8, 1), foreL=(0.1, -1, 0.6), armR=(-0.3, -0.8, 1), foreR=(-0.1, -1, 0.6))
-anim("ThrowLw", 40, [(0, HOLD), (8, SLAM_UP), (13, SLAM_DN, "in"), (20, SLAM_DN), (40, S)], keep_root=True)
+anim("ThrowLw", 40, [(0, HOLD), (8, SLAM_UP), (12, tuck(90, hip=BALL_HIP)), (24, tuck(810, hip=BALL_HIP), "lin"), (30, P(CROUCH, root=(750, 0, 0))), (40, P(S, root=(720, 0, 0)))], keep_root=True)
+show_ball("ThrowLw", 13, 25)   # v66: grinds them into the floor with the spin ball (was a slam)
 
 
 # ------------------------------------------------------------------ taunt: the finger wag (Sonic 1 title screen / Sonic CD / SA1)
@@ -252,7 +256,10 @@ anim("AppealL", 60, [(f, mirror(p_) if p_ is not S else S) for f, p_ in _wag])
 _DB = P(root=(15, 0, 0), chest=(48, 0, 0), head=(40, 0, 0), footL=-5, footR=-5,
         thighL=(0.22, 0.25, 1), shinL=(0.06, -1, -0.5), thighR=(-0.22, 0.2, 1), shinR=(-0.06, -1, -0.55),
         armL=(0.45, -0.8, 0.8), foreL=(-0.1, -0.5, 1))
-DUCK = reach(_DB, "R", head_point(_DB, (-0.6, 0.7, 0.6), 0.9), pole=(-1, 0.3, -0.5))
+DUCK = P(root=(22, 0, 0), chest=(32, 0, 0), head=(-8, 0, 0), footL=-5, footR=-5,      # v66: plain Sonic 1 duck, hands on his knees
+         thighL=(0.25, 0.35, 1), shinL=(0.08, -1, -0.55), thighR=(-0.25, 0.3, 1), shinR=(-0.08, -1, -0.6),
+         armL=(0.45, -1, 0.6), foreL=(0.15, -0.6, 1), armR=(-0.45, -1, 0.6), foreR=(-0.15, -0.6, 1))
+_DUCK_V56 = reach(_DB, "R", head_point(_DB, (-0.6, 0.7, 0.6), 0.9), pole=(-1, 0.3, -0.5))   # v56-v65 crouch (glove over the head)
 anim("Squat", 8, [(0, S), (8, DUCK, "out")])
 anim("SquatWait", 158, [(0, DUCK), (79, P(DUCK, chest=(53, 0, 0))), (158, DUCK)])
 anim("SquatRv", 10, [(0, DUCK), (10, S)])
@@ -513,25 +520,19 @@ move("ForwardTilt", ["AttackS3Hi", "AttackS3HiS", "AttackS3S", "AttackS3LwS", "A
 
 UTF = dict(ground=0, pivot=(0, 2.0, 0), thighL=(0.12, -1, 0.3), shinL=(0.08, -1, 0.12), thighR=(-0.12, -1, 0.3), shinR=(-0.08, -1, 0.12), footL=40, footR=40,
            armL=(1, -0.3, 0.2), foreL=(1, 0.1, 0.3), armR=(-1, -0.3, 0.2), foreR=(-1, 0.1, 0.3))
-# up tilt (v65): Insta-Shield flash overhead (Sonic 3). Until v64 this was the same flip kick as the up air. He rises onto
-# his toes and pirouettes once with his right arm up; the white crescent (model part 25, on the hips) whirls with the turn
-# and sweeps a dome over his head. Hit frames, angle and knockback are the old ones; the hitboxes moved from the feet of the
-# flip to a sphere above his head and a smaller one in front of his chest.
-IS_W = P(S, root=(6, -40, 0), chest=(6, -20, 0), head=(-10, 20, 0), armR=(-0.7, -0.6, -0.5), foreR=(-0.5, 0.2, -0.6), armL=(0.6, -0.6, 0.5), foreL=(0.2, 0.3, 0.9),
-         thighL=(0.12, -1, 0.3), shinL=(0.08, -1, -0.25), thighR=(-0.12, -1, -0.1), shinR=(-0.08, -1, -0.4))
-_IS = dict(chest=(-8, 0, 0), head=(-25, 0, 0), armR=(-0.2, 1, 0.15), foreR=(-0.05, 1, 0.05), armL=(0.9, -0.6, -0.2), foreL=(0.8, -0.3, 0.3),
-           thighL=(0.08, -1, 0.05), shinL=(0.05, -1, -0.05), thighR=(-0.08, -1, 0.0), shinR=(-0.05, -1, -0.1), footL=35, footR=35)
-IS_T = lambda yaw: P(S, root=(-4, yaw, 0), **_IS)      # noqa: E731
+# v66: back to the flip kick (user); the v65 Insta-Shield flash is now the up smash
 move("UpTilt", "AttackHi3", 28,
-     [(0, S), (3, IS_W), (5, IS_T(0), "out"), (11, IS_T(360), "lin"), (16, P(S, root=(4, 360, 0), chest=(8, 0, 0))), (28, P(S, root=(0, 360, 0)))],
-     [(6, 10, [Hit(0, 2, 8, 4.4, 92, 35, 95, off=(0, 7.0, 1.2)), Hit(1, 2, 7, 3.0, 92, 35, 95, off=(0, 3.0, 5.5))])], iasa=24, insta=(5, 12))
+     [(0, S), (3, P(CROUCH, root=(-5, 0, 0))), (5, P(S, root=(-80, 0, 0), hip=(0, 1.5, 0), **UTF), "in"), (10, P(S, root=(-225, 0, 0), hip=(0, 3.0, 0), **UTF), "lin"),
+      (15, tuck(-320, pivot=(0, 2.0, 0), hip=(0, 1.5, 0)), "lin"), (20, P(LAND, root=(-360, 0, 0)), "lin"), (28, P(S, root=(-360, 0, 0)))],
+     [(6, 10, [Hit(0, 16, 8, 2.6, 92, 35, 95, off=(1.6, 0, 0)), Hit(1, 10, 8, 2.6, 92, 35, 95, off=(1.6, 0, 0)), Hit(2, 14, 7, 2.0, 92, 35, 95, off=(2.4, 0, 0))])], iasa=24)
 
 # down tilt (v54): Somersault (SA2). From the duck he rolls forward along the floor as a ball (7 units), then pops a low kick
 # out of the roll that launches upward for combos.
-SOM_K = P(DUCK, root=(366, 0, 0), chest=(35, 0, 0), thighR=(-0.2, -0.05, 1), shinR=(-0.15, 0.0, 1), footR=-20, move=7.5)
+# v66: rolls in place (it used to roll 7.5 forward and snap back when the move ended)
+SOM_K = P(DUCK, root=(366, 0, 0), chest=(35, 0, 0), thighR=(-0.2, -0.05, 1), shinR=(-0.15, 0.0, 1), footR=-20)
 move("DownTilt", "AttackLw3", 26,
-     [(0, DUCK), (3, tuck(45, hip=(0, -7.1, 0), move=1.0)), (10, tuck(360, hip=(0, -7.1, 0), move=7.0), "lin"), (12, SOM_K, "out"), (15, SOM_K),
-      (20, P(DUCK, root=(366, 0, 0), move=7.5)), (26, P(DUCK, root=(366, 0, 0), move=7.5))],
+     [(0, DUCK), (3, tuck(45, hip=(0, -7.1, 0))), (10, tuck(360, hip=(0, -7.1, 0)), "lin"), (12, SOM_K, "out"), (15, SOM_K),
+      (20, P(DUCK, root=(366, 0, 0))), (26, P(DUCK, root=(366, 0, 0)))],
      [(4, 10, [ball(4, 60, 0, 100, size=4.0, wdsk=22)]), (12, 14, leg("R", 5, 85, 40, 70, size=2.6, shin_dmg=5, elem=1))], iasa=23, ball=(3, 11))   # v61: flame kick = SA2's Fire Somersault (Flame Ring)
 
 
@@ -550,18 +551,23 @@ _emhand = lambda f, W: ((W[47] @ np.array([*EM_C, 1.0]))[:3], 0)   # noqa: E731
 # v54: the forward smash is a full boomerang throw. Same wind-up (charge on frame 7); on frame 15 the gem leaves his hand,
 # spins out 24 units at chest height by frame 24 and is back in his hand by frame 38. Strong on the way out, weak on the way back.
 FS_C = P(EM_F, root=(8, 0, 0), chest=(4, 20, 0), armR=(-0.2, -0.3, 1), foreR=(-0.1, 0.05, 1))
-move("ForwardSmash", ["AttackS4Hi", "AttackS4S", "AttackS4Lw"], 50,
-     [(0, S), (4, EM_W1, "out"), (7, EM_W2), (12, P(EM_W2, chest=(-12, -80, 0))), (14, P(EM_T2, move=2.0), "in"), (16, EM_T2, "out"),
-      (22, EM_F), (38, FS_C), (50, P(S, move=3.5))],
-     [(15, 24, [Hit(0, 62, 17, 2.8, 361, 35, 100)]), (25, 38, [Hit(1, 62, 8, 2.4, 361, 20, 70)])], charge=7, iasa=46, emerald=(3, 40),
-     prop=boom((0.0, 7.0, 27.0), 14, 24, 38, spin=50))
+# v66: quicker, shorter, weaker (user): 50 -> 40 frames, gem out to 15 units (was 27), 13% / 4% (was 17% / 8%)
+move("ForwardSmash", ["AttackS4Hi", "AttackS4S", "AttackS4Lw"], 40,
+     [(0, S), (3, EM_W1, "out"), (5, EM_W2), (8, P(EM_W2, chest=(-12, -80, 0))), (10, P(EM_T2, move=2.0), "in"), (12, EM_T2, "out"),
+      (17, EM_F), (26, FS_C), (40, S)],
+     [(11, 17, [Hit(0, 62, 13, 2.6, 361, 35, 100)]), (18, 26, [Hit(1, 62, 4, 2.2, 361, 20, 70)])], charge=5, iasa=36, emerald=(2, 30),
+     prop=boom((0.0, 7.0, 15.0), 10, 17, 26, spin=50))
 
-# up smash: the ball spins on the spot for the four weak hits (so they keep connecting), then leaps for the last one
-move("UpSmash", "AttackHi4", 48,
-     [(0, S), (5, CROUCH), (8, tuck(120, hip=(0, -7.1, 0))), (18, tuck(620, hip=(0, -7.1, 0)), "lin"), (22, tuck(800, hip=(0, 3.5, 0)), "out"),
-      (29, P(LAND, root=(1088, 0, 0)), "lin"), (48, P(S, root=(1080, 0, 0)))],
-     [(8, 9, [ball(2, 90, 0, 100, wdsk=14)]), (11, 12, [ball(2, 90, 0, 100, wdsk=14)]), (14, 15, [ball(2, 90, 0, 100, wdsk=14)]),
-      (17, 18, [ball(2, 90, 0, 100, wdsk=14)]), (20, 22, [ball(5, 88, 45, 110, size=5.6)])], charge=6, iasa=44, ball=(9, 24))
+# up smash (v66): Insta-Shield flash overhead (Sonic 3), moved from the v65 up tilt and made a kill move. He rises onto his
+# toes and pirouettes with his right arm up while the white crescent (part 25) whirls over his head.
+IS_W = P(S, root=(6, -40, 0), chest=(6, -20, 0), head=(-10, 20, 0), armR=(-0.7, -0.6, -0.5), foreR=(-0.5, 0.2, -0.6), armL=(0.6, -0.6, 0.5), foreL=(0.2, 0.3, 0.9),
+         thighL=(0.12, -1, 0.3), shinL=(0.08, -1, -0.25), thighR=(-0.12, -1, -0.1), shinR=(-0.08, -1, -0.4))
+_IS = dict(chest=(-8, 0, 0), head=(-25, 0, 0), armR=(-0.2, 1, 0.15), foreR=(-0.05, 1, 0.05), armL=(0.9, -0.6, -0.2), foreL=(0.8, -0.3, 0.3),
+           thighL=(0.08, -1, 0.05), shinL=(0.05, -1, -0.05), thighR=(-0.08, -1, 0.0), shinR=(-0.05, -1, -0.1), footL=35, footR=35)
+IS_T = lambda yaw: P(S, root=(-4, yaw, 0), **_IS)      # noqa: E731
+move("UpSmash", "AttackHi4", 46,
+     [(0, S), (4, CROUCH), (6, IS_W), (8, IS_T(0), "out"), (15, IS_T(360), "lin"), (20, P(S, root=(4, 360, 0), chest=(8, 0, 0))), (46, P(S, root=(0, 360, 0)))],
+     [(10, 14, [Hit(0, 2, 17, 4.6, 88, 40, 112, off=(0, 7.0, 1.2)), Hit(1, 2, 14, 3.2, 88, 40, 105, off=(0, 3.0, 5.5))])], charge=6, iasa=42, insta=(8, 16))
 
 
 SPLIT = P(root=(0, 0, 0), chest=(25, 0, 0), head=(-20, 0, 0), thighL=(0.05, -0.16, 1), shinL=(0.05, -0.1, 1), thighR=(-0.05, -0.16, -1), shinR=(-0.05, -0.1, -1),
@@ -576,13 +582,14 @@ _WMF = dict(ground=0, floor=1, chest=(30, 0, 0), head=(40, 0, 0), footL=-10, foo
             armL=(1, -0.2, -0.4), foreL=(0.6, -0.8, -0.3), armR=(-1, -0.2, -0.4), foreR=(-0.6, -0.8, -0.3),
             thighL=(0.1, -1, -0.17), shinL=(0.05, -1, -0.1), thighR=(-0.1, 1, 0.17), shinR=(-0.05, 1, 0.25))
 WMF = lambda yaw: P(root=(-100, yaw, 0), **_WMF)      # noqa: E731
-move("DownSmash", "AttackLw4", 44,
-     [(0, S), (4, P(TUCK, root=(-60, -80, 0), floor=1)), (7, WMF(0), "lin"), (9, WMF(40), "lin"), (13.5, WMF(180), "lin"), (16, WMF(255), "lin"),
-      (20, WMF(360), "out"), (27, P(CRF, root=(30, 360, 0))), (44, P(S, root=(0, 360, 0)))],
-     [(8, 10, [Hit(0, 10, 13, 2.6, 30, 30, 90, off=(1.6, 0, 0)), Hit(1, 8, 12, 2.0, 30, 30, 90, off=(2.4, 0, 0)),
+move("DownSmash", "AttackLw4", 50,   # v66: 44 -> 50 frames, hits 2-4 frames later (user: slightly slower)
+    
+     [(0, S), (5, P(TUCK, root=(-60, -80, 0), floor=1)), (9, WMF(0), "lin"), (11, WMF(40), "lin"), (16.5, WMF(180), "lin"), (19.5, WMF(255), "lin"),
+      (24, WMF(360), "out"), (32, P(CRF, root=(30, 360, 0))), (50, P(S, root=(0, 360, 0)))],
+     [(10, 12, [Hit(0, 10, 13, 2.6, 30, 30, 90, off=(1.6, 0, 0)), Hit(1, 8, 12, 2.0, 30, 30, 90, off=(2.4, 0, 0)),
                Hit(2, 16, 11, 2.6, 30, 30, 90, off=(1.6, 0, 0)), Hit(3, 14, 10, 2.0, 30, 30, 90, off=(2.4, 0, 0))]),
-      (11, 17, [Hit(0, 10, 8, 2.4, 30, 20, 80, off=(1.6, 0, 0)), Hit(1, 8, 7, 1.9, 30, 20, 80, off=(2.4, 0, 0)),
-                Hit(2, 16, 8, 2.4, 30, 20, 80, off=(1.6, 0, 0)), Hit(3, 14, 7, 1.9, 30, 20, 80, off=(2.4, 0, 0))])], charge=5, iasa=40)
+      (13, 21, [Hit(0, 10, 8, 2.4, 30, 20, 80, off=(1.6, 0, 0)), Hit(1, 8, 7, 1.9, 30, 20, 80, off=(2.4, 0, 0)),
+                Hit(2, 16, 8, 2.4, 30, 20, 80, off=(1.6, 0, 0)), Hit(3, 14, 7, 1.9, 30, 20, 80, off=(2.4, 0, 0))])], charge=6, iasa=46)
 
 # ------------------------------------------------------------------ aerials
 move("NeutralAir", "AttackAirN", 39, [(0, FALL), (3, tuck(60)), (27, tuck(780), "lin"), (33, P(FALL, root=(720, 0, 0)), "lin"), (39, P(FALL, root=(720, 0, 0)))],
@@ -622,7 +629,8 @@ DRILL = P(ground=0, chest=(0, 0, 0), head=(15, 0, 0), footL=70, footR=70,
           armL=(0.3, 1, 0.05), foreL=(-0.2, 1, 0), armR=(-0.3, 1, 0.05), foreR=(0.2, 1, 0))
 dh = lambda: leg("R", 2, 290, 0, 100, size=2.6, wdsk=25)  # noqa: E731
 move("DownAir", "AttackAirLw", 44,
-     [(0, FALL), (3, tuck(20)), (5, DRILL, "out"), (12, P(DRILL, hip=(0, -0.6, 0))), (19, DRILL), (26, P(DRILL, hip=(0, -0.6, 0))), (32, FALL), (44, FALL)],
+     [(0, FALL), (3, tuck(20)), (5, DRILL, "out"), (12, P(DRILL, root=(0, 360, 0), hip=(0, -0.6, 0)), "lin"), (19, P(DRILL, root=(0, 720, 0)), "lin"),
+      (26, P(DRILL, root=(0, 1080, 0), hip=(0, -0.6, 0)), "lin"), (32, P(FALL, root=(0, 1080, 0))), (44, P(FALL, root=(0, 1080, 0)))],   # v66: spins 3 turns (a drill)
      [(6, 7, dh()), (10, 11, dh()), (14, 15, dh()), (18, 19, dh()), (22, 23, dh()), (24, 26, leg("R", 3, 361, 30, 100, size=2.8))], aerial=(3, 34), iasa=40)
 
 # ------------------------------------------------------------------ specials (states and movement are in fighter_code/sonic.c)
@@ -719,8 +727,8 @@ SFX = {
     "Jab1": [(2, W1, SW)], "Jab2": [(2, W1, SW)], "Jab3": [(4, W2, SW), (4, GRUNT[0], VOICE)],
     "DashAttack": [(4, SPIN_RELEASE, SND)],
     "ForwardTilt": [(5, SWIPE, SND)], "UpTilt": [(4, W2, SW)], "DownTilt": [(3, SPIN_RELEASE, SND), (11, W1, SW)],
-    "ForwardSmash": [(14, WS, SND), (14, GRUNT[1], VOICE), (16, SWIPE, SND)], "UpSmash": [(7, SPIN_CHARGE, SND), (19, GRUNT[2], VOICE)],
-    "DownSmash": [(6, W3, SW), (6, GRUNT[3], VOICE)],
+    "ForwardSmash": [(10, WS, SND), (10, GRUNT[1], VOICE), (12, SWIPE, SND)], "UpSmash": [(9, W3, SW), (9, GRUNT[2], VOICE)],
+    "DownSmash": [(8, W3, SW), (8, GRUNT[3], VOICE)],
     "NeutralAir": [(3, W1, SW)], "ForwardAir": [(9, W3, SW), (9, GRUNT[4], VOICE)], "BackAir": [(4, W3, SW)],
     "UpAir": [(4, W2, SW)], "DownAir": [(5, W3, SW)],
     "HomingAttack": [(1, HOMING, SND), (1, GRUNT[0], VOICE)],

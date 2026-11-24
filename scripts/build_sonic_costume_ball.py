@@ -205,7 +205,7 @@ for (image, dif, clamp_u, clamp_v), corners in sorted(groups.items(), key=lambda
         amount = 0.06 if image == 'stx_eye2' else 0.0      # lifting the whites (v27-v30) only let more of the blue brow cover them
         eyes = np.array([wp(c) for c in groups[next(k for k in groups if k[0] == 'stx_eye00')] if c["bone"] in HEAD])
         pivot = eyes.mean(axis=0) + np.array([0.0, 0.0, -1.3])        # inside the head, behind the eyes
-        TURN = math.radians(0)                                        # Melee's camera is side-on: turn each iris toward its own side
+        TURN = math.radians(14)   # v66: 0 -> 14 (user: eyes more visible from the side)                                        # Melee's camera is side-on: turn each iris toward its own side
         use = []
         for c in corners:
             if c["bone"] not in HEAD:
@@ -215,7 +215,7 @@ for (image, dif, clamp_u, clamp_v), corners in sorted(groups.items(), key=lambda
             if image == 'stx_eye2':
                 sgn = 1.0 if p_[0] > pivot[0] else -1.0
                 side = np.array([wp(q) for q in corners if (wp(q)[0] > pivot[0]) == (p_[0] > pivot[0])]).mean(axis=0)
-                p_ = side + (p_ - side) * 1.0                         # each iris 20% larger about its own centre
+                p_ = side + (p_ - side) * 1.12   # v66: irises 12% larger                         # each iris 20% larger about its own centre
                 ca, sa_ = math.cos(sgn * TURN), math.sin(sgn * TURN)
                 d = p_ - pivot
                 p_ = pivot + np.array([ca * d[0] + sa_ * d[2], d[1], -sa_ * d[0] + ca * d[2]])

@@ -753,3 +753,23 @@ Checked offline on the final `PlSn_v65.dat`: the stored shield pose reads back i
 
 Not verified: the crescent on the up tilt was not seen on a capture (commands confirmed in the file only); the down smash's rear hit and its late hit (Fox only stood in front); shield, blink and bounce were not re-run in game on v65.
 
+## v66: quicker forward smash, Insta-Shield up smash, old up tilt back, slower down smash, ball throws, new crouch/grabs, eyes (2026-11-24)
+
+File: `builds/Melee - Sonic v66.iso` (only build kept; v65 deleted). Package `work/sonic_package_v66.zip`, model `work/v19/PlSnNr_v66.dat`, animations `PlSnAJ_v66.dat` (625,856 bytes), fighter code unchanged (`ftFunction_v64.dat`). Build log shows "shield pose written: 63 joints".
+
+User: "fix down air, down tilt teleports back, the crouch looks super weird, give fsmash less range, make down smash animation slightly slower, make his eyes slightly more viewable from the side, give him his old up tilt, make his new uptilt his upsmash, make it kill early, make tails pick him up for his recovery, better dash grab and grab animation, make his fsmash quicker with a lot less range and less damage, use his spikes more in his grabs, do more attacks".
+
+- Forward smash, from -> to: 50 -> 40 frames, charge f7 -> f5, IASA 46 -> 36; gem out f15-24 -> f11-17, 17% -> 13%, size 2.8 -> 2.6, flies 27 -> 15 units; return f25-38 -> f18-26, 8% -> 4%, size 2.4 -> 2.2. Knockback unchanged. No longer ends 3.5 units forward (it snapped back).
+- Up smash, from -> to: ball spin (4 x 2% + 5%, 48 frames) -> Insta-Shield flash (the v65 up tilt, Sonic 3): one hit f10-14, 17% overhead (size 4.6, angle 88, BKB 40, KBG 112) and 14% in front (size 3.2, KBG 105); 46 frames, charge f6, IASA 42.
+- Up tilt: back to the v64 flip kick and its values.
+- Down smash, from -> to: 44 -> 50 frames, charge f5 -> f6, IASA 40 -> 46, hits f8-10 -> f10-12 and f11-17 -> f13-21. Damage and knockback unchanged.
+- Down tilt: the Somersault now rolls in place (it rolled 7.5 units forward and snapped back at the end). Hitboxes unchanged.
+- Down air: the drill now spins three turns. Hitboxes unchanged.
+- Crouch: the v56 glove-over-the-head pose -> a plain Sonic 1 duck, hands on his knees.
+- Grab and dash grab: new lunge poses (hands pulled back, then a lunge with the front foot out). Grab frames unchanged.
+- Throws use the spin ball (model shown through the game's own scripts): forward = spin-ball ram (was a punch), up = spin-ball launch upward (was an uppercut), down = spin-ball grind on the floor (was a slam). Release frames and hitboxes unchanged.
+- Eyes: irises turned 0 -> 14 degrees toward each side and 12% larger.
+- Test v66 (`--only=utilt,usmash,fsmash,dsmash,dtilt,grab --big`, FD, Fox in front): up smash f10 17%, knockback (0.13, 3.85); forward smash f11 13% then f18 3.6% on the return; down smash f10 13%; up tilt f6 7%; grab catches Fox on f6. Down tilt: the test's input did not register (he stayed STANDING), so the new roll was not seen in game.
+
+Not done: Tails carrying him as the recovery. Tails' SA1 model is in the user's files (`extract/sa1/figure/miles/models/m_kihon3_miles.nja.sa1mdl`, plus tail models and animations); it needs the model brought in as a new part and a new up B. Not verified in game: down tilt, down air, crouch, the throws, the new eyes.
+

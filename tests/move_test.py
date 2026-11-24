@@ -156,7 +156,7 @@ if "--spinshots" in sys.argv:
 _only = [a_.split("=", 1)[1].split(",") for a_ in sys.argv if a_.startswith("--only=")]
 if _only:        # --only=utilt,dsmash : run just these moves of the selected list, with captures on the frames below
     MOVES = [m_ for m_ in MOVES if m_[0] in _only[0]]
-    SHOTS = {"utilt": (4,), "dsmash": (5, 9, 13, 17, 26)}
+    SHOTS = {"utilt": (8,), "usmash": (9, 12), "fsmash": (12, 16), "dsmash": (11, 18), "dtilt": (6, 14, 25), "grab": (7,)}
 
 
 def main():
