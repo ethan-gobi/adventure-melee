@@ -749,5 +749,7 @@ User picked "New attacks". Forward tilt, forward smash, down tilt, neutral air a
 - Down smash: split kick -> breakdance windmill, a full turn on his shoulders with the legs in a flat split (left foot 6.7 in front, right foot 4.2 behind at hip height on the early hit). Early hit unchanged: f8-10, 13/12/11/10% (left foot, left shin, right foot, right shin), angle 30, BKB 30, KBG 90. New late hit f11-17: 8% feet, 7% shins, angle 30, BKB 20, KBG 80; it follows straight on from the early hit, so it cannot hit someone the early hit already hit. Unchanged: 44 frames, charge frame 5, IASA 40.
 - Test v65 (`tests/move_test.py ... --only=utilt,dsmash --big`, new `--only=` filter, FD, Fox standing in front): up tilt hits f6 for 8.0%, knockback (-0.06, 1.74); down smash hits f8 for 13.0%, knockback (1.79, 1.03). Captures `test_logs/v65_na_*.png`, `v65_ut_utilt_4.png`: windmill seen spinning low with the hit spark; up tilt pose seen (arm up, turning).
 
-Not verified: the crescent on the up tilt was not caught on a capture (same script mechanism as the neutral air's); the down smash's rear hit and its late hit (Fox only stood in front); shield, blink and bounce were not re-run on v65 (their code and data are unchanged from v64).
+Checked offline on the final `PlSn_v65.dat`: the stored shield pose reads back identical to v64's on all 63 joints (in v65 it came from the moves build instead of `patch_shield_pose.py`); the up tilt script switches the crescent on at f5 and off at f12.
+
+Not verified: the crescent on the up tilt was not seen on a capture (commands confirmed in the file only); the down smash's rear hit and its late hit (Fox only stood in front); shield, blink and bounce were not re-run in game on v65.
 
