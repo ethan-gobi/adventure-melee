@@ -29,7 +29,7 @@ def shot(keep_r, centre, scale, yaw, size):
 
 os.makedirs(out, exist_ok=True)
 # portrait: head and shoulders, three-quarter view
-p = shot(11.0, head + np.array([0.0, 0.5, 1.0]), 30, 30, 400).resize((136, 136), Image.LANCZOS)
+p = shot(8.0, head + np.array([0.0, 2.0, 1.5]), 42, 30, 400).resize((136, 136), Image.LANCZOS)   # v68: head only (v67 showed the T-pose arms)
 csp = Image.new("RGBA", (136, 188), (0, 0, 0, 0))
 csp.paste(p, (0, 20), p)
 csp.save(os.path.join(out, "csp.png"))

@@ -781,3 +781,12 @@ Not verified in game yet (asked chat Claude in `.bridge/messages.md`). The 128x1
 
 Open from chat Claude's v66 report: an out-of-memory crash (HSD heap assert, memory.c line 52) after about 8 minutes in Training; jumping did not leave the ground for chat Claude (works in the test harness); down air and throws still unchecked. Down tilt stays in place (confirmed); crouch fine; eyes still show only a thin iris sliver from the side and the user finds them odd from the front.
 
+## v68: eyes reverted, head portrait (2026-11-24)
+
+File: `builds/Melee - Sonic v68.iso` (only build kept; v66, v67 deleted). Package `work/sonic_package_v68.zip`: v66 gameplay files, model `work/v19/PlSnNr_v68.dat`, pictures `work/icons_v68/`.
+- v67 checked by chat Claude: grid icon and stock icons show Sonic; portrait showed the T-pose arms; jumping works (its earlier report was its own input); user found the v66 eyes "super duper creepy" from the front and asked to revert.
+- Eyes, from -> to: iris turn 14 -> 0 degrees, iris size 1.12 -> 1.0 (back to v64/v65; model file byte-identical to `PlSnNr_v64.dat`).
+- Portrait, from -> to: head and shoulders with T-pose arms -> head-only close-up, three-quarter view. The series emblem (Falcon's) behind it is unchanged.
+- Test v68: loads into a match; up smash f10 17%, grab catches on f6.
+Still open: out-of-memory crash after ~8 min in Training (needs a soak test); down air and throws unchecked in game; Tails-carry recovery not started; Falcon emblem on the portrait panel.
+
