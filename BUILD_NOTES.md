@@ -817,3 +817,13 @@ User: "make the up b recover a bit more and polished", "make the up b cancelable
 
 Not verified: shield cancel of the up B, ledge grab during the carry, the off-stage miss recovery, bank turns and taunt in game; memory with the bigger model (the 8-minute crash is still open).
 
+## v73: Sonic Adventure lives icon for stocks and the select screen; recovery and soak tests (2026-11-26)
+
+File: `builds/Melee - Sonic v73.iso` (only build kept; v72 deleted). Package `work/sonic_package_v73.zip` = v72 with new pictures (`work/icons_v73`). Gameplay identical to v72.
+User: "put a proper icon, take like a sonic adventure asset for it and just use the lives systems from the game like maybe the genesis 16 bit head as the stock icon"; "do all this on your own, no chat Claude" (bridge request closed).
+- Stock icon, from -> to: render of his model -> SA1's own lives icon `hyoji_zanki_s` (32x32, from `CON_REGULAR.PRS`, unpacked to `extract/sa1_ui/`), scaled to 24x24. Seen in game: four of them in the HUD (`test_logs/v73_hud.png`).
+- Select-screen grid icon, from -> to: model render -> the same lives icon, 56x56 (pixel-doubled) in the 64x56 slot. Portrait unchanged (v68 head render). There is no 16-bit Genesis head in the SA1 files; the SA1 lives icon is the game's own.
+- Recovery tests on v72 (`tests/recovery_test.py`, FD left edge): shield cancel of the Tails carry -> normal fall and no second carry (a later up input gave a double jump instead); Tails from 27 below the stage -> rose past the ledge and landed on stage (no ledge grab on the way up); neutral B miss off stage -> he still double jumped, used Tails and got back on stage.
+- Soak test (`tests/soak_test.py`): both runs ended when the match ended (stocks ran out at 59-89 s; screen back on the character select), so the 8-minute out-of-memory crash is still not reproduced.
+Still open: Captain Falcon's series emblem behind the damage percent and portrait; the memory crash.
+
