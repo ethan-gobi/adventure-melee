@@ -546,11 +546,15 @@ move("UpTilt", "AttackHi3", 28,
 
 # down tilt (v54): Somersault (SA2). From the duck he rolls forward along the floor as a ball (7 units), then pops a low kick
 # out of the roll that launches upward for combos.
-# v66: rolls in place (it used to roll 7.5 forward and snap back when the move ended)
-SOM_K = P(DUCK, root=(366, 0, 0), chest=(35, 0, 0), thighR=(-0.2, -0.05, 1), shinR=(-0.15, 0.0, 1), footR=-20)
+# v75: down tilt = Somersault (SA2): rolls 5 forward as a ball, pops out into a low slide kick (leaning back on his hands,
+# front leg straight out along the floor), then slides his hips back to where he started over the recovery, so there is
+# no snap back. Hit frames and values unchanged (ball f4-10, fire kick f12-14).
+SLIDE = P(ground=1.0, root=(-28, 0, 0), chest=(24, 0, 0), head=(18, 0, 0), footR=-35, footL=10,
+          thighR=(-0.12, -0.22, 1), shinR=(-0.06, -0.12, 1), thighL=(0.22, -0.55, 0.8), shinL=(0.1, -1, -0.65),
+          armL=(0.55, -1, -0.65), foreL=(0.2, -1, -0.3), armR=(-0.55, -1, -0.65), foreR=(-0.2, -1, -0.3))
 move("DownTilt", "AttackLw3", 26,
-     [(0, DUCK), (3, tuck(45, hip=(0, -7.1, 0))), (10, tuck(360, hip=(0, -7.1, 0)), "lin"), (12, SOM_K, "out"), (15, SOM_K),
-      (20, P(DUCK, root=(366, 0, 0))), (26, P(DUCK, root=(366, 0, 0)))],
+     [(0, DUCK), (3, tuck(45, hip=(0, -7.1, 0), move=1.0)), (10, tuck(360, hip=(0, -7.1, 0), move=5.0), "lin"), (12, P(SLIDE, root=(-28 + 360, 0, 0), move=4.0), "out"),
+      (15, P(SLIDE, root=(-28 + 360, 0, 0), move=3.5)), (21, P(DUCK, root=(22 + 360, 0, 0), move=1.0)), (26, P(DUCK, root=(22 + 360, 0, 0)))],
      [(4, 10, [ball(4, 60, 0, 100, size=4.0, wdsk=22)]), (12, 14, leg("R", 5, 85, 40, 70, size=2.6, shin_dmg=5, elem=1))], iasa=23, ball=(3, 11))   # v61: flame kick = SA2's Fire Somersault (Flame Ring)
 
 
@@ -712,7 +716,7 @@ CARRY2 = reach(reach(P(_HANG, thighL=(0.12, -1, -0.15), shinL=(0.07, -1, -0.45),
                      "L", _TH + np.array([0.7, 0, 0]), pole=(1, 0, -0.3)), "R", _TH + np.array([-0.7, 0, 0]), pole=(-1, 0, -0.3))
 REACHUP = P(_HANG, armL=(0.45, 0.75, 0.3), foreL=(0.25, 1, 0.15), armR=(-0.45, 0.75, 0.3), foreR=(-0.25, 1, 0.15))   # v70: arms going up as Tails swoops in
 move("TailsCarry", "SpecialHiCatch", 80, [(0, REACHUP), (6, CARRY, "out"), (18, CARRY2), (30, CARRY), (42, CARRY2), (54, CARRY), (66, CARRY2), (80, CARRY)], [],
-     prop=lambda f, W: (np.array(_TJ["pivot"]), f * 47.0))
+     prop=lambda f, W: (np.array(_TJ["pivot"]), 0.0))   # v75: Tails is one piece on bone 62 now (no separate tail spin)
 move("BounceAttack", "SpecialAirLw", 60, [(0, FALL), (4, tuck(90)), (60, tuck(1770), "lin")],
      [(3, 60, [ball(9, 70, 30, 80)])], ball=(5, 0))
 

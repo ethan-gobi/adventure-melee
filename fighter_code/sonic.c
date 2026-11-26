@@ -22,6 +22,10 @@
 #define ST_TAILS 351 // v69: air up B, Tails carries Sonic up (anim SpecialHiCatch, 309)
 #define TAILS_FRAMES 70   // carried this long, then Tails lets go: helpless fall (v70: 60 -> 70)
 #define TAILS_RISE 1.15f  // rising speed for frames 8-45, then it fades to 0.35 by the end (v70: 1.0 -> 1.15, 40 -> 45, 0.2 -> 0.35)
+#define TAILS_PIVOT_Y 20.49f // Tails model origin on bone 62 (model builder, PlSnNr_v69_tails.json)
+#define TAILS_PIVOT_Z -2.99f
+#define TAILS_FLYOFF 30    // v75: frames Tails takes to fly up and away, shrinking, after letting go
+#define TAILS_WINDOW 30    // v75: frames Sonic can still act after a natural release before free fall
 #define TAILS_DRIFT 1.1f  // max sideways speed, steered with the stick (v70: 0.9 -> 1.1)
 #define ST_LSD_SIDE 346 // same move as 344 with the head-first flying pose, used when the dash is mostly sideways
 
@@ -406,11 +410,19 @@ void Tails_Anim(GOBJ *fighter)
     if (fd->state_var.state_var1 > 8 && (fd->input.held & (PAD_TRIGGER_L | PAD_TRIGGER_R)))
     { // v70: shield cancels the carry: Tails lets go, normal fall (can air dodge), no second up B until he lands
         fd->fighter_var.ft_var4 = 1;
+        fd->fighter_var.ft_var6 = 1; // Tails flies off
+        fd->jump.jumps_used = fd->attr.max_jumps; // v75: no jump after up B (user), cancelled or not
         Fighter_EnterFall(fighter);
         return;
     }
     if (fd->state_var.state_var1 > TAILS_FRAMES)
-        Fighter_EnterSpecialFall(fighter, 1, 1, 0, 1.0f, 15.0f); // Tails lets go
+    { // v75: Tails lets go and flies off; Sonic can act for TAILS_WINDOW frames (no double jump, no second carry), then free fall
+        fd->fighter_var.ft_var4 = 1;
+        fd->fighter_var.ft_var6 = 1;
+        fd->fighter_var.ft_var7 = 1;
+        fd->jump.jumps_used = fd->attr.max_jumps;
+        Fighter_EnterFall(fighter);
+    }
 }
 
 void Tails_Phys(GOBJ *fighter)
@@ -590,10 +602,11 @@ void OnFrame(GOBJ *fighter)
         fd->fighter_var.ft_var4 = 0;
         fd->fighter_var.ft_var5 = 0;
     }
-    // v70: Homing Attack lock-on reticle (SA1/SA2) on the nearest opponent in range while he jumps or falls and can use it.
+    // Homing Attack lock-on reticle (SA1/SA2) on the target. v74: only while he is the ball homing in on someone (the dash
+    // of the Homing Attack with a target, before it hits); v70-v73 showed it whenever he jumped or fell with it available.
     // Model part on bone 62 (visibility group 6), moved onto the target each frame.
     int ret = 0;
-    if (fd->phys.air_state == 1 && !fd->fighter_var.ft_var5 && s >= ASID_JUMPF && s <= ASID_FALLAERIALB)
+    if (s == ST_HOMING && fd->state_var.state_var2 && fd->state_var.state_var4 == 0 && fd->state_var.state_var1 <= HOMING_FRAMES)
     {
         float dx = 0, dy = 0;
         if (FindTarget(fighter, &dx, &dy))
@@ -620,7 +633,36 @@ void OnFrame(GOBJ *fighter)
     if (fd->dobj_toggle[0].index != 0)
         lid = 0;
     Fighter_SetVisGroupCurrent(fighter, 4, lid);
-    Fighter_SetVisGroupCurrent(fighter, 5, s == ST_TAILS ? 1 : 0); // v69: Tails only while he carries Sonic
+    // v75: after letting go, Tails (whole model on bone 62) flies up and forward and shrinks away over TAILS_FLYOFF frames
+    int tails_vis = (s == ST_TAILS);
+    if (fd->fighter_var.ft_var6 > 0 && s != ST_TAILS)
+    {
+        int t = fd->fighter_var.ft_var6++;
+        JOBJ *tj = fd->bones[62].joint;
+        float k = 1.0f - (float)t / (float)TAILS_FLYOFF;
+        tj->trans.X = 0.0f;
+        tj->trans.Y = TAILS_PIVOT_Y + 1.6f * (float)t;
+        tj->trans.Z = TAILS_PIVOT_Z + 1.1f * (float)t;
+        tj->scale.X = k; tj->scale.Y = k; tj->scale.Z = k;
+        JOBJ_SetMtxDirtySub(tj);
+        tails_vis = 1;
+        if (t >= TAILS_FLYOFF)
+            fd->fighter_var.ft_var6 = 0;
+    }
+    else if (s == ST_TAILS)
+        fd->fighter_var.ft_var6 = 0;
+    Fighter_SetVisGroupCurrent(fighter, 5, tails_vis);
+    // v75: release window: after TAILS_WINDOW frames, the next time he is in a plain fall he goes into free fall
+    if (fd->fighter_var.ft_var7 > 0)
+    {
+        if (fd->phys.air_state == 0 || s == ASID_CLIFFCATCH || s == ASID_CLIFFWAIT || (s >= ASID_DAMAGEHI1 && s <= ASID_DAMAGEFLYROLL) || s == ASID_DAMAGEFALL)
+            fd->fighter_var.ft_var7 = 0; // landed, grabbed a ledge or got hit: no free fall
+        else if (++fd->fighter_var.ft_var7 > TAILS_WINDOW && s >= ASID_FALL && s <= ASID_FALLAERIALB)
+        {
+            fd->fighter_var.ft_var7 = 0;
+            Fighter_EnterSpecialFall(fighter, 1, 1, 0, 1.0f, 15.0f);
+        }
+    }
 }
 
 // ---------------------------------------------------------------- state table (state 341 + index)

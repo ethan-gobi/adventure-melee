@@ -1,7 +1,7 @@
 # Builds a new versioned ISO: clean Melee copy + m-ex + the Sonic fighter package.
 # Usage: powershell -File build_iso.ps1 -Version v01 -Package C:\adventure-melee\work\sonic_package_v01.zip
 # Never overwrites an existing build and never touches base\Melee NTSC 1.02 clean.iso.
-param([Parameter(Mandatory)][string]$Version, [string]$Package, [switch]$NoFighter, [switch]$NoIcon, [string]$SoundBank, [string]$IconPng)
+param([Parameter(Mandatory)][string]$Version, [string]$Package, [switch]$NoFighter, [switch]$NoIcon, [string]$SoundBank, [string]$IconPng, [string]$EmblemPng)
 . C:\adventure-melee\scripts\mex_common.ps1
 $out = "C:\adventure-melee\builds\Melee - Sonic $Version.iso"
 if (Test-Path $out) { throw "Build already exists, refusing to overwrite: $out" }
@@ -90,7 +90,11 @@ try {
     $icon.Fighter = $sonic
     $roy = $icons | Where-Object { $_.Fighter.NameText -eq 'Roy' } | Select-Object -First 1
     "Roy icon at X=$($roy.X) Y=$($roy.Y) W=$($roy.Width);  Falcon icon at X=$($src.X) Y=$($src.Y)"
-    $icon.X = $roy.X + 7.0; $icon.Y = $roy.Y
+    # v76: in the empty slot at the left end of the bottom row (left of Pichu); right of Roy (v1-v75) is past the edge of
+    # the grid, where the screen frame cut the icon off
+    $pichu = $icons | Where-Object { $_.Fighter.NameText -eq 'Pichu' } | Select-Object -First 1
+    $icon.X = $pichu.X - ($roy.X - ($icons | Where-Object { $_.Fighter.NameText -eq 'Marth' } | Select-Object -First 1).X); $icon.Y = $pichu.Y
+    "Pichu icon at X=$($pichu.X) Y=$($pichu.Y)"
     $icon.StartX = $icon.X; $icon.StartY = $icon.Y
     if ($IconPng) {    # v67: Sonic's own picture instead of Captain Falcon's, same size and format as the slot's image
         Add-Type -AssemblyName System.Drawing
@@ -106,6 +110,32 @@ try {
         "icon image replaced from $IconPng"
     }
     $icons.Add($icon.PSObject.BaseObject)
+    Add-Type -AssemblyName System.Drawing
+    if ($EmblemPng) {   # v74: Sonic's own series emblem (white head silhouette), a copy of Falcon's emblem slot with a new image
+        $emb = Mex-Field 'Emblems'
+        $srcE = $emb[[int]$falconF.InsigniaID]
+        $ed = $srcE.ImageData
+        $ew = [int]$ed.Width; $eh = [int]$ed.Height
+        $keepImg = $srcE.ImageData; $keepTlut = $srcE.TlutData
+        $hashBefore = [BitConverter]::ToString((New-Object Security.Cryptography.MD5CryptoServiceProvider).ComputeHash($keepImg.ImageData))
+        $srcE.ImageData = $null; $srcE.TlutData = $null
+        $newE = Copy-Obj $srcE                      # without its image, so the new image never overwrites the original's
+        $srcE.ImageData = $keepImg; $srcE.TlutData = $keepTlut
+        $bmpE = New-Object System.Drawing.Bitmap($ew, $eh, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+        $grE = [System.Drawing.Graphics]::FromImage($bmpE); $grE.InterpolationMode = 'HighQualityBicubic'
+        $srcImgE = [System.Drawing.Image]::FromFile($EmblemPng); $grE.DrawImage($srcImgE, 0, 0, $ew, $eh); $grE.Dispose(); $srcImgE.Dispose()
+        $bdE = $bmpE.LockBits((New-Object System.Drawing.Rectangle(0, 0, $ew, $eh)), 'ReadOnly', [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+        $bytesE = New-Object byte[] ($ew * $eh * 4); [System.Runtime.InteropServices.Marshal]::Copy($bdE.Scan0, $bytesE, 0, $bytesE.Length); $bmpE.UnlockBits($bdE); $bmpE.Dispose()
+        for ($i = 0; $i -lt $bytesE.Length; $i += 4) { $a = $bytesE[$i + 3]; $bytesE[$i] = $a; $bytesE[$i + 1] = $a; $bytesE[$i + 2] = $a }   # shape into intensity too
+        "emblem image was $ew x $eh $($ed.Format), Falcon's emblem index $($falconF.InsigniaID)"
+        $newE.EncodeImageData($bytesE, $ew, $eh, $ed.Format, [HSDRaw.GX.GXTlutFmt]::IA8)
+        $emb.Add($newE)
+        $sonic.InsigniaID = [byte]($emb.Count - 1)
+        "Sonic emblem index $($sonic.InsigniaID) of $($emb.Count)"
+        $hashAfter = [BitConverter]::ToString((New-Object Security.Cryptography.MD5CryptoServiceProvider).ComputeHash($emb[[int]$falconF.InsigniaID].ImageData.ImageData))
+        "original emblem $($falconF.InsigniaID) unchanged: $($hashBefore -eq $hashAfter)"
+        $fighters | Where-Object { $_.InsigniaID -eq $falconF.InsigniaID } | ForEach-Object { "  emblem $($falconF.InsigniaID) is used by: $($_.NameText)" }
+    }
     "icons: $($icons.Count); Sonic icon at X=$($icon.X) Y=$($icon.Y)"
 
     }

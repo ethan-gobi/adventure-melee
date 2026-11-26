@@ -22,7 +22,7 @@ DUMP_FRAMES = False
 WIN = (640, 528)   # game window size; tests that need a close look set a larger one
 OFFSCREEN = False  # open the game window off-screen (not minimized) so it can be captured  # save every rendered frame as PNG in the temp user folder
 DISABLE_CODES = []  # Slippi Dolphin code names to disable in the temp user folder only
-SONIC_CSS_X, SONIC_CSS_Y = 27.2, 4.5  # one icon to the right of Roy
+SONIC_CSS_X, SONIC_CSS_Y = -29.0, 4.5  # v76: left end of the bottom row, left of Pichu (v1-v75: 27.2, 4.5, right of Roy)
 
 # libmelee does not know m-ex fighter IDs; map unknown ones instead of crashing and remember them.
 UNKNOWN_CHARACTER_IDS = []

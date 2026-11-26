@@ -279,6 +279,10 @@ class Runner:
                 elif picked[1] and picked[2] and time.time() - self.picked_time > 0.8 and pulse.ready():
                     slots = [self.m.read(0x803F0E08 + 0x24 * i, 4).hex() for i in range(2)]
                     self.say("both picked, slot bytes", slots, "-> START")
+                    if getattr(self, "css_shot", None) and not getattr(self, "_css_done", False):
+                        self._css_done = True
+                        time.sleep(0.8)
+                        self.say("css capture", self.s.capture_game(self.css_shot))
                     pulse.fire(lambda: c1.press_button(START))
                 pulse.apply()
             elif major == 2 and minor == 1:

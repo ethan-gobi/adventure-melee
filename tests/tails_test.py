@@ -21,6 +21,7 @@ def main():
     harness.OFFSCREEN = True
     harness.WIN = (1280, 1000)
     r = runner.Runner(iso, prefix)
+    r.css_shot = prefix + "_css.png"          # character select screen, once both are picked
     target = (harness.SONIC_CSS_X, harness.SONIC_CSS_Y) if p1 == "SONIC" else runner.vanilla_css_pos(enums.Character[p1])
     try:
         r.start()

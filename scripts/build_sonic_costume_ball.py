@@ -501,7 +501,7 @@ _y0, _y1 = _ewp[:, 1].min(), _ewp[:, 1].max()
 lid = []
 for c, p_ in zip(_ecs, _ewp):
     o = (p_ - _epiv) / np.linalg.norm(p_ - _epiv)
-    q = p_ + 0.16 * o                                   # irises sit 0.06 out, the lids just in front of them
+    q = p_ + 0.30 * o                                   # v75: 0.16 -> 0.30 (the 1.18x irises poked through)
     lid.append(((np.linalg.inv(W[c["bone"]]) @ np.append(q, 1.0))[:3], W[c["bone"]][:3, :3].T @ o,
                 (0.5, 0.05 + 0.9 * (_y1 - p_[1]) / (_y1 - _y0)), c["bone"]))
 _fur = np.array(Image.open(os.path.join(tex_dir, "stx_btest1.png")).convert("RGB"), dtype=float).reshape(-1, 3).mean(axis=0)
@@ -544,10 +544,9 @@ if os.path.exists(TAILS_JSON):
             for cs in tris_:
                 for pq, nq, uvq in cs:
                     pw_ = pq + off
-                    if want_tail:
-                        pl_, bone_ = (W62i @ np.append(pw_ - pivot + W[62][:3, 3], 1.0))[:3], 62
-                    else:
-                        pl_, bone_ = (W1i @ np.append(pw_, 1.0))[:3], 1
+                    # v75: the whole of Tails on bone 62 around the tail pivot (v69-v74: body on bone 1), so the fighter
+                    # code can fly him off when he lets go; the carry animation holds bone 62 at the pivot
+                    pl_, bone_ = (W62i @ np.append(pw_ - pivot + W[62][:3, 3], 1.0))[:3], 62
                     corners_.append((pl_, nq / (np.linalg.norm(nq) + 1e-9), uvq, bone_))
             src_ = os.path.join(TAILS_TEX, im + ".png")
             timg = Image.open(src_).convert("RGB") if os.path.exists(src_) else Image.new("RGB", (8, 8), (255, 255, 255))
@@ -590,7 +589,7 @@ for (pl_, nl_, uv_, b_) in lid:
     pw_ = (W[b_] @ np.append(pl_, 1.0))[:3]
     pw_[1] = _y1 + 0.08 - (_y1 + 0.08 - pw_[1]) * 0.45
     o_ = (pw_ - _epiv) / np.linalg.norm(pw_ - _epiv)
-    pw_ = _epiv + o_ * (_erad + 0.2)          # out past the eye bulge (squashing it up had sunk it behind the whites)
+    pw_ = _epiv + o_ * (_erad + 0.34)         # out past the eye bulge and the irises (v75: 0.2 -> 0.34)
     hl.append(((np.linalg.inv(W[b_]) @ np.append(pw_, 1.0))[:3], W[b_][:3, :3].T @ o_, uv_, b_))
 make_dobj(hl, ltex)
 print(f"  dobj {dobj_count - 1:2}: half eyelids, {len(hl) // 3} triangles")

@@ -41,3 +41,25 @@ print("written", os.path.join(out, "csp.png"), os.path.join(out, "stc.png"))
 g = shot(7.5, head + np.array([0.0, 2.0, 1.5]), 26, 25, 300).resize((128, 128), Image.LANCZOS)
 g.save(os.path.join(out, "css_icon.png"))
 print("written", os.path.join(out, "css_icon.png"))
+# series emblem (v74): white silhouette of his head in profile (quills out the back), alpha from the render
+keep = np.linalg.norm(tris.mean(1) - head, axis=1) < 10.0              # whole head incl. quills (no arm filter here)
+e = render(tris[keep], cols[keep], 90, head + np.array([0.0, 1.0, -1.5]), 20, size=300)
+ea = np.asarray(e).astype(int)
+solid = ~np.all(np.abs(ea[..., :3] - 200) <= 1, axis=-1)
+outside = np.zeros_like(solid)                                     # flood the background from the border; holes get filled
+stack = [(0, 0), (0, 299), (299, 0), (299, 299)]
+while stack:
+    yy, xx = stack.pop()
+    if 0 <= yy < 300 and 0 <= xx < 300 and not outside[yy, xx] and not solid[yy, xx]:
+        outside[yy, xx] = True
+        stack += [(yy + 1, xx), (yy - 1, xx), (yy, xx + 1), (yy, xx - 1)]
+sil = np.zeros((300, 300, 4), dtype=np.uint8)
+sil[..., :3] = 255
+sil[..., 3] = np.where(outside, 0, 255)
+em = Image.fromarray(sil, "RGBA").transpose(Image.FLIP_LEFT_RIGHT)      # facing right, quills to the left
+em = em.crop(em.getbbox())
+side = int(max(em.size) * 1.12)
+sq = Image.new("RGBA", (side, side), (255, 255, 255, 0))
+sq.paste(em, ((side - em.width) // 2, (side - em.height) // 2), em)
+sq.resize((128, 128), Image.LANCZOS).save(os.path.join(out, "emblem.png"))
+print("written", os.path.join(out, "emblem.png"))
