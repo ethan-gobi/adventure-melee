@@ -803,3 +803,17 @@ User: "make tails pick him up for his recovery", "wheres tails carry on on your 
 
 Not verified: the tail spin is hard to see in the captures; ledge grab during the carry; how it looks from the front; memory use with the bigger model (the 8-minute out-of-memory crash is still open).
 
+## v70-v72: up B recovers further + shield cancel, neutral B fixes and reticle, attack face, bigger irises, sounds (2026-11-26)
+
+File: `builds/Melee - Sonic v72.iso` (only build kept; v69-v71 deleted). Package `work/sonic_package_v72.zip`: PlSn/PlSnAJ from v71 (`PlSn_v71.dat`, `PlSnAJ_v71.dat`, fighter code `ftFunction_v71.dat`), model `PlSnNr_v72.dat` (45 parts).
+User: "make the up b recover a bit more and polished", "make the up b cancelable with shield", "make the neutral b have less end lag", "acts really weird when you miss cuz of an airdodge", "if you use it off stage ur dead", "add the homing attack reticle", "make his eyes more visible from side view without moving them", "facial expressions more akin to the ones in game", "the neutral special sound effect sounds bad and activates when you airdodge", "improve other moves, add nods".
+
+- Air up B (Tails carry), from -> to: 60 -> 70 frames; rise 1.0 for f8-40 fading to 0.2 -> 1.15 for f8-45 fading to 0.35; steering max 0.9 -> 1.1, 0.08 -> 0.10 per frame. New: L or R after frame 8 cancels it (Tails lets go, normal fall, can air dodge; no second up B until he lands or grabs a ledge). Animation: arms reach up as Tails arrives (f0-6), whoosh sound at f1. Test v71: rises 35.9 -> 97.6 (62 units, was 44). Shield cancel not tested in game.
+- Neutral B (Homing Attack), from -> to: end lag after a miss 60 -> 52 frames, lag after a hit 34 -> 30, landing lag after a miss 28 -> 24 (cap 48 -> 40). Steers at the target only for the first 6 frames, then flies straight (it chased air-dodging targets every frame). A miss no longer uses up the double jump (own flag instead of jumps used; cleared on landing or ledge grab). During the end lag he can drift (0.06 per frame, max 1.0) and falls slower (gravity 0.15 -> 0.10, max fall 1.8). Sound: SA1 homing clip + grunt -> Melee medium whoosh (165), no voice. Test v71: hit 8% at f10; miss on the ground actionable at frame 65 (v62: 73).
+- Reticle (SA1/SA2 lock-on): green ring with four yellow pointers (model part 43, visibility group 6) drawn on the nearest opponent within 75 units while he jumps or falls and the Homing Attack is available. Fighter code moves bone 62 onto the target each frame. Seen in game on v70 (`test_logs/v70_ret_8.png`).
+- Dodge sounds: air dodge and spot dodge no longer play a voice (they played grunt 560007, the same clip as neutral B, carried over from Falcon's scripts).
+- Eyes, from -> to: iris size 1.0 -> 1.18 and 0.06 -> 0.09 out from the eye, same place, not turned. Attack face: new half eyelids (part 44, group 4 set 2) over the top of the eyes whenever the mouth is open on an attack (fighter code). v71 had them behind the eye whites; v72 places them out past the eye bulge. Seen in game on v72 (`test_logs/v72_face_sheet.png`: forward smash narrowed eyes, idle normal).
+- Nods/animation: taunt ends on a thumbs-up (Sonic CD / SA1 goal pose); pummel is a quill headbutt (was a knee; damage unchanged); leaning bank turns on Turn and TurnRun (Falcon's timing and root motion kept).
+
+Not verified: shield cancel of the up B, ledge grab during the carry, the off-stage miss recovery, bank turns and taunt in game; memory with the bigger model (the 8-minute crash is still open).
+

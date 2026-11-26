@@ -20,22 +20,23 @@
 #define LD_FRAMES 12
 #define LD_END 30
 #define ST_TAILS 351 // v69: air up B, Tails carries Sonic up (anim SpecialHiCatch, 309)
-#define TAILS_FRAMES 60   // carried this long, then Tails lets go: helpless fall
-#define TAILS_RISE 1.0f   // rising speed for frames 8-40, then it fades to 0.2 by the end
-#define TAILS_DRIFT 0.9f  // max sideways speed, steered with the stick
+#define TAILS_FRAMES 70   // carried this long, then Tails lets go: helpless fall (v70: 60 -> 70)
+#define TAILS_RISE 1.15f  // rising speed for frames 8-45, then it fades to 0.35 by the end (v70: 1.0 -> 1.15, 40 -> 45, 0.2 -> 0.35)
+#define TAILS_DRIFT 1.1f  // max sideways speed, steered with the stick (v70: 0.9 -> 1.1)
 #define ST_LSD_SIDE 346 // same move as 344 with the head-first flying pose, used when the dash is mostly sideways
 
 #define HOMING_RANGE 75.0f
 #define HOMING_SPEED 3.4f
 #define HOMING_FRAMES 24
+#define HOMING_TRACK 6 // v70: frames the dash keeps steering at the target
 #define AIRDASH_SPEED 2.8f
 #define AIRDASH_FRAMES 12
-#define HOMING_ENDLAG 60 // extra frames after the dash where Sonic just falls and cannot act (v52: 14 -> 24, v54: -> 32, v58: -> 44, v61: -> 60;
+#define HOMING_ENDLAG 52 // extra frames after the dash where Sonic just falls and cannot act (v52: 14 -> 24, v54: -> 32, v58: -> 44, v61: -> 60, v70: -> 52 (user: less);
                          // before v58 the 40-frame animation ended the move early, so only about 16 frames ever played)
-#define HOMING_HITLAG 34 // frames after a hit, popping up and back, before he can act (v52: 0 -> 12, v54: -> 20, v58: -> 26, v61: -> 34)
-#define HOMING_LANDLAG 28.0f // landing lag if he touches the floor during the move (v54: 4 -> 14, v58: -> 20, v61: -> 28)
+#define HOMING_HITLAG 30 // frames after a hit, popping up and back, before he can act (v52: 0 -> 12, v54: -> 20, v58: -> 26, v61: -> 34, v70: -> 30)
+#define HOMING_LANDLAG 24.0f // landing lag if he touches the floor during the move (v54: 4 -> 14, v58: -> 20, v61: -> 28, v70: -> 24)
 #define HOMING_HIT_LANDLAG 20.0f // landing lag if he touches the floor during the pop-up after a hit (v58-v60 value, kept in v61)
-#define HOMING_LANDLAG_MAX 48.0f // v59: a missed Homing Attack that lands takes its remaining end lag as landing lag, up to this (v61: 36 -> 48)
+#define HOMING_LANDLAG_MAX 40.0f // v59: a missed Homing Attack that lands takes its remaining end lag as landing lag, up to this (v61: 36 -> 48, v70: -> 40)
 #define BOUNCE_ENDLAG 18 // frames after the rebound before Sonic can act
 #define ROLL_BASE 3.0f
 #define ROLL_BONUS 1.6f
@@ -121,8 +122,8 @@ INL void HomingStart(GOBJ *fighter, int allow_target)
     FighterData *fd = fighter->userdata;
     if (fd->phys.air_state == 0)
         Fighter_SetAirborne(fd);
-    else if (fd->jump.jumps_used > fd->attr.max_jumps)
-        return; // already missed one this airtime (marker set in Homing_Anim); cleared by the game on landing
+    else if (fd->fighter_var.ft_var5)
+        return; // already missed one this airtime (v70: own flag, so a miss no longer uses up the double jump); cleared on landing / ledge
     float dx = 0, dy = 0;
     int has = allow_target ? FindTarget(fighter, &dx, &dy) : 0;
     if (has && dx != 0.0f)
@@ -157,7 +158,7 @@ void Homing_Anim(GOBJ *fighter)
     int limit = (fd->state_var.state_var2 ? HOMING_FRAMES : AIRDASH_FRAMES) + HOMING_ENDLAG;
     if (fd->state_var.state_var1 > limit || FrameTimerCheck(fighter) == 0)
     { // missed: normal fall (not helpless), but no second Homing Attack or double jump until landing
-        fd->jump.jumps_used = fd->attr.max_jumps + 1;
+        fd->fighter_var.ft_var5 = 1;
         Fighter_EnterFall(fighter);
     }
 }
@@ -172,13 +173,19 @@ void Homing_Phys(GOBJ *fighter)
         return;
     }
     if (fd->state_var.state_var1 > (fd->state_var.state_var2 ? HOMING_FRAMES : AIRDASH_FRAMES))
-    { // end lag: no steering, just slow down and fall
-        fd->phys.self_vel.X = fd->phys.self_vel.X * 0.9f;
-        fd->phys.self_vel.Y = fd->phys.self_vel.Y - 0.15f;
+    { // end lag (v70): he can drift with the stick and falls slower, so a miss off stage can still recover
+        float vx = fd->phys.self_vel.X * 0.9f + fd->input.lstick.X * 0.06f;
+        if (vx > 1.0f)
+            vx = 1.0f;
+        if (vx < -1.0f)
+            vx = -1.0f;
+        fd->phys.self_vel.X = vx;
+        float vy = fd->phys.self_vel.Y - 0.10f;
+        fd->phys.self_vel.Y = (vy < -1.8f) ? -1.8f : vy;
         return;
     }
-    if (fd->state_var.state_var2)
-    {
+    if (fd->state_var.state_var2 && fd->state_var.state_var1 <= HOMING_TRACK)
+    { // v70: steers only for the first HOMING_TRACK frames, then flies straight (it used to chase an air-dodging target)
         float dx = 0, dy = 0;
         if (FindTarget(fighter, &dx, &dy))
         {
@@ -385,6 +392,8 @@ void SpecialHi(GOBJ *fighter) { LsdStart(fighter); }
 void SpecialAirHi(GOBJ *fighter)
 { // v69: Tails carry (Sonic 3). Ground up B is still the Peel-Out.
     FighterData *fd = fighter->userdata;
+    if (fd->fighter_var.ft_var4)
+        return; // already cancelled one carry this airtime (cleared on landing in OnFrame)
     EnterState(fighter, ST_TAILS);
     fd->phys.self_vel.X = fd->phys.self_vel.X * 0.5f;
     fd->phys.self_vel.Y = 0.0f;
@@ -394,6 +403,12 @@ void Tails_Anim(GOBJ *fighter)
 {
     FighterData *fd = fighter->userdata;
     fd->state_var.state_var1++;
+    if (fd->state_var.state_var1 > 8 && (fd->input.held & (PAD_TRIGGER_L | PAD_TRIGGER_R)))
+    { // v70: shield cancels the carry: Tails lets go, normal fall (can air dodge), no second up B until he lands
+        fd->fighter_var.ft_var4 = 1;
+        Fighter_EnterFall(fighter);
+        return;
+    }
     if (fd->state_var.state_var1 > TAILS_FRAMES)
         Fighter_EnterSpecialFall(fighter, 1, 1, 0, 1.0f, 15.0f); // Tails lets go
 }
@@ -405,12 +420,12 @@ void Tails_Phys(GOBJ *fighter)
     float vy;
     if (t < 8)
         vy = 0.0f; // Tails swoops in and grabs his hands
-    else if (t < 40)
+    else if (t < 45)
         vy = TAILS_RISE;
     else
-        vy = TAILS_RISE - (TAILS_RISE - 0.2f) * (float)(t - 40) / (float)(TAILS_FRAMES - 40);
+        vy = TAILS_RISE - (TAILS_RISE - 0.35f) * (float)(t - 45) / (float)(TAILS_FRAMES - 45);
     fd->phys.self_vel.Y = vy;
-    float vx = fd->phys.self_vel.X * 0.96f + fd->input.lstick.X * 0.08f;
+    float vx = fd->phys.self_vel.X * 0.96f + fd->input.lstick.X * 0.10f;
     if (vx > TAILS_DRIFT)
         vx = TAILS_DRIFT;
     if (vx < -TAILS_DRIFT)
@@ -570,6 +585,28 @@ void OnFrame(GOBJ *fighter)
     // v64: Bounce Attack chain ends once he is on the floor in any other state
     if (fd->phys.air_state == 0 && s != ST_BOUNCE)
         fd->fighter_var.ft_var3 = 0;
+    if (fd->phys.air_state == 0 || s == ASID_CLIFFCATCH || s == ASID_CLIFFWAIT)
+    { // v70: on the floor or on a ledge: up B (Tails) and neutral B usable again
+        fd->fighter_var.ft_var4 = 0;
+        fd->fighter_var.ft_var5 = 0;
+    }
+    // v70: Homing Attack lock-on reticle (SA1/SA2) on the nearest opponent in range while he jumps or falls and can use it.
+    // Model part on bone 62 (visibility group 6), moved onto the target each frame.
+    int ret = 0;
+    if (fd->phys.air_state == 1 && !fd->fighter_var.ft_var5 && s >= ASID_JUMPF && s <= ASID_FALLAERIALB)
+    {
+        float dx = 0, dy = 0;
+        if (FindTarget(fighter, &dx, &dy))
+        {
+            JOBJ *j = fd->bones[62].joint;
+            j->trans.X = 0.0f;
+            j->trans.Y = dy + 7.0f;   // target centre (FindTarget measures from 6 above his feet) + 2
+            j->trans.Z = dx * fd->facing_direction;
+            JOBJ_SetMtxDirtySub(j);
+            ret = 1;
+        }
+    }
+    Fighter_SetVisGroupCurrent(fighter, 6, ret);
     // v64: eyelids (visibility group 4, set 1). A short blink every BLINK_PERIOD frames; shut while asleep (297-299),
     // dizzy after a shield break (211), flinching from a hit (75-91) and knocked down (183-185, 191-193).
     // Only while the normal body is showing (group 0, set 0): never on the spin ball.
@@ -579,7 +616,10 @@ void OnFrame(GOBJ *fighter)
         shut = 1;
     if (fd->dobj_toggle[0].index != 0)
         shut = 0;
-    Fighter_SetVisGroupCurrent(fighter, 4, shut ? 1 : 0);
+    int lid = shut ? 1 : (fd->dobj_toggle[3].index == 1 ? 2 : 0); // v70: half-closed eyes while the mouth is open (attack face)
+    if (fd->dobj_toggle[0].index != 0)
+        lid = 0;
+    Fighter_SetVisGroupCurrent(fighter, 4, lid);
     Fighter_SetVisGroupCurrent(fighter, 5, s == ST_TAILS ? 1 : 0); // v69: Tails only while he carries Sonic
 }
 

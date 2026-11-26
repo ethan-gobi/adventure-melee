@@ -202,7 +202,7 @@ for (image, dif, clamp_u, clamp_v), corners in sorted(groups.items(), key=lambda
         HEAD = (38, 39, 40, 41)
         wp = lambda c: (W[c["bone"]] @ np.append(c["pl"], 1.0))[:3]   # noqa: E731
         centre = np.mean([wp(c) for cs in groups.values() for c in cs if c["bone"] in HEAD], axis=0)
-        amount = 0.06 if image == 'stx_eye2' else 0.0      # lifting the whites (v27-v30) only let more of the blue brow cover them
+        amount = 0.09 if image == 'stx_eye2' else 0.0   # v70: 0.06 -> 0.09      # lifting the whites (v27-v30) only let more of the blue brow cover them
         eyes = np.array([wp(c) for c in groups[next(k for k in groups if k[0] == 'stx_eye00')] if c["bone"] in HEAD])
         pivot = eyes.mean(axis=0) + np.array([0.0, 0.0, -1.3])        # inside the head, behind the eyes
         TURN = math.radians(0)    # v68: back to 0 (v66 14 looked creepy from the front, user)                                        # Melee's camera is side-on: turn each iris toward its own side
@@ -215,7 +215,7 @@ for (image, dif, clamp_u, clamp_v), corners in sorted(groups.items(), key=lambda
             if image == 'stx_eye2':
                 sgn = 1.0 if p_[0] > pivot[0] else -1.0
                 side = np.array([wp(q) for q in corners if (wp(q)[0] > pivot[0]) == (p_[0] > pivot[0])]).mean(axis=0)
-                p_ = side + (p_ - side) * 1.0    # v68: back to 1.0 (v66 1.12)                         # each iris 20% larger about its own centre
+                p_ = side + (p_ - side) * 1.18   # v70: 1.0 -> 1.18, not turned (user: more visible from the side, same place)                         # each iris 20% larger about its own centre
                 ca, sa_ = math.cos(sgn * TURN), math.sin(sgn * TURN)
                 d = p_ - pivot
                 p_ = pivot + np.array([ca * d[0] + sa_ * d[2], d[1], -sa_ * d[0] + ca * d[2]])
@@ -559,6 +559,41 @@ if os.path.exists(TAILS_JSON):
             dd_.Mobj.Textures.WrapT = GXWrapMode.REPEAT
             tails_counts[want_tail] += 1
     print(f"  dobjs {dobj_count - sum(tails_counts):2}-{dobj_count - 1}: Tails, {tails_counts[0]} body + {tails_counts[1]} tail parts; tail pivot {np.round(pivot, 2)}")
+# ---- after Tails: Homing Attack lock-on reticle (v70, SA1/SA2): a green ring with four yellow pointers, flat in the plane
+# facing the camera (bone 62's local Y-Z plane). The fighter code moves bone 62 onto the target and shows it (group 6).
+rtex = np.zeros((8, 8, 4), dtype=np.uint8)
+rtex[:, :4, :3] = (60, 230, 40)        # BGR green
+rtex[:, 4:, :3] = (40, 220, 255)       # BGR yellow
+rtex[..., 3] = 255
+rc, RN, RR, RW = [], 32, 4.2, 0.35
+nX = np.array([1.0, 0.0, 0.0])
+o62 = W[62][:3, 3]
+W62i_ = np.linalg.inv(W[62])
+loc = lambda q: (W62i_ @ np.append(o62 + q, 1.0))[:3]     # noqa: E731
+for k_ in range(RN):
+    a0, a1 = 2 * math.pi * k_ / RN, 2 * math.pi * (k_ + 1) / RN
+    q = [np.array([0.0, r_ * math.cos(a_), r_ * math.sin(a_)]) for r_, a_ in ((RR + RW, a0), (RR - RW, a0), (RR - RW, a1), (RR + RW, a1))]
+    for i3 in ((0, 1, 2), (0, 2, 3)):
+        rc += [(loc(q[i]), nX, (0.25, 0.5), 62) for i in i3]
+for a_ in (0, 0.5 * math.pi, math.pi, 1.5 * math.pi):        # pointers just outside the ring, aimed at the centre
+    tip, base = RR + 0.6, RR + 2.0
+    side = np.array([0.0, -math.sin(a_), math.cos(a_)]) * 0.8
+    dirv = np.array([0.0, math.cos(a_), math.sin(a_)])
+    rc += [(loc(dirv * tip), nX, (0.75, 0.5), 62), (loc(dirv * base + side), nX, (0.75, 0.5), 62), (loc(dirv * base - side), nX, (0.75, 0.5), 62)]
+make_dobj(rc, rtex, amb=255)
+print(f"  dobj {dobj_count - 1:2}: Homing Attack reticle, {len(rc) // 3} triangles")
+# ---- after the reticle: half-closed eyelids (v70), the narrowed attack look of SA1/SA2. The full lid squashed up to the
+# top 45% of the eye, a little further out. Group 4 set 2; the fighter code shows it while the mouth is open (attacks).
+hl = []
+_erad = float(np.max(np.linalg.norm(_ewp - _epiv, axis=1)))
+for (pl_, nl_, uv_, b_) in lid:
+    pw_ = (W[b_] @ np.append(pl_, 1.0))[:3]
+    pw_[1] = _y1 + 0.08 - (_y1 + 0.08 - pw_[1]) * 0.45
+    o_ = (pw_ - _epiv) / np.linalg.norm(pw_ - _epiv)
+    pw_ = _epiv + o_ * (_erad + 0.2)          # out past the eye bulge (squashing it up had sunk it behind the whites)
+    hl.append(((np.linalg.inv(W[b_]) @ np.append(pw_, 1.0))[:3], W[b_][:3, :3].T @ o_, uv_, b_))
+make_dobj(hl, ltex)
+print(f"  dobj {dobj_count - 1:2}: half eyelids, {len(hl) // 3} triangles")
 json.dump({"tails_parts": sum(tails_counts)}, open(os.path.splitext(out_dat)[0] + "_extra.json", "w"))
 
 gen.SaveChanges()

@@ -225,7 +225,7 @@ HOLD = P(root=(6, 0, 0), chest=(6, 0, 0), armL=(0.4, -0.25, 1), foreL=(-0.15, 0.
 anim("Catch", 30, [(0, S), (3, GRAB_W), (6, REACH, "out"), (10, REACH), (30, S)])
 anim("CatchDash", 40, [(0, P(S, root=(20, 0, 0))), (4, P(GRAB_W, root=(14, 0, 0))), (9, P(REACH, root=(34, 0, 0), hip=(0, -1.5, 0)), "out"), (16, P(REACH, root=(30, 0, 0))), (40, S)], keep_root=True)
 anim("CatchWait", 30, [(0, HOLD), (15, P(HOLD, chest=(9, 0, 0))), (30, HOLD)])
-anim("CatchAttack", 24, [(0, HOLD), (3, P(HOLD, root=(-8, 0, 0), thighR=(-0.1, 0.35, 1), shinR=(-0.05, -1, 0.35)), "out"), (7, P(HOLD, root=(-8, 0, 0), thighR=(-0.1, 0.35, 1), shinR=(-0.05, -1, 0.35))), (24, HOLD)])
+anim("CatchAttack", 24, [(0, HOLD), (4, P(HOLD, root=(-6, 0, 0), chest=(-15, 0, 0), head=(-20, 0, 0))), (7, P(HOLD, root=(18, 0, 0), chest=(22, 0, 0), head=(28, 0, 0)), "out"), (12, P(HOLD, root=(16, 0, 0), chest=(20, 0, 0), head=(25, 0, 0))), (24, HOLD)])   # v70: quill headbutt (was a knee)
 anim("CatchCut", 30, [(0, HOLD), (6, P(HURT, root=(-14, 0, 0))), (30, S)], keep_root=True)
 PUNCH_L = P(S, root=(8, 0, 0), chest=(10, -40, 0), armL=(0.05, 0.1, 1), foreL=(-0.05, 0.1, 1), armR=(-0.5, -0.7, -0.6), foreR=(-0.4, -0.2, 0.7))
 anim("ThrowF", 40, [(0, HOLD), (5, P(CROUCH, root=(20, 0, 0))), (8, tuck(60, hip=BALL_HIP)), (18, tuck(780, hip=BALL_HIP), "lin"), (22, P(CROUCH, root=(780, 0, 0))), (40, P(S, root=(720, 0, 0)))], keep_root=True)
@@ -246,9 +246,10 @@ show_ball("ThrowLw", 13, 25)   # v66: grinds them into the floor with the spin b
 WAG0 = P(S, root=(0, -70, 0), chest=(0, -10, 0), head=(-5, -15, 0), armR=(-0.5, -0.4, 0.6), foreR=(-0.1, 1, 0.3), armL=(0.7, -1, -0.1), foreL=(0.2, -0.5, 0.8))
 WAG1 = P(WAG0, foreR=(-0.5, 1, 0.3))
 WAG2 = P(WAG0, foreR=(0.3, 1, 0.3))
-_wag = [(0, S), (10, WAG0), (18, WAG1), (26, WAG2), (34, WAG1), (42, WAG2), (50, WAG0), (60, S)]
+THUMB = P(WAG0, chest=(-4, -10, 0), head=(-12, -15, 0), armR=(-0.55, 0.1, 0.85), foreR=(-0.1, 1, 0.25))   # v70: ends on a thumbs-up (Sonic CD / SA1 goal pose)
+_wag = [(0, S), (8, WAG0), (14, WAG1), (20, WAG2), (26, WAG1), (32, WAG2), (38, WAG0), (43, THUMB, "out"), (54, THUMB), (60, S)]
 anim("AppealR", 60, _wag)
-anim("AppealL", 60, [(f, mirror(p_) if p_ is not S else S) for f, p_ in _wag])
+anim("AppealL", 60, [(k_[0], mirror(k_[1]) if k_[1] is not S else S) + tuple(k_[2:]) for k_ in _wag])
 
 # ------------------------------------------------------------------ classic references (Sonic 1 - SA2 only)
 # crouch: the Sonic 1 duck. Sits right down on his heels, knees up, curled over them with the head tucked in.
@@ -412,6 +413,22 @@ fanim("MissFoot", 25, [(0, P(HURT, root=(-10, 0, 0))), (8, P(FLY, root=(-40, 0, 
 SPLAT = P(ground=0, root=(-8, 0, 0), chest=(-12, 0, 0), head=(-30, 0, 0), armL=(1, 0.7, -0.3), foreL=(0.9, 1, -0.2), armR=(-1, 0.7, -0.3), foreR=(-0.9, 1, -0.2),
           thighL=(0.6, -1, -0.2), shinL=(0.4, -1, -0.4), thighR=(-0.6, -1, -0.2), shinR=(-0.4, -1, -0.4), footL=30, footR=30)
 fanim("WallDamage", 49, [(0, SPLAT), (10, P(SPLAT, head=(-36, 0, 0))), (26, FLY), (49, TUMBLE)], keep_root=True)
+
+# ------------------------------------------------------------------ turns (v70): leaning bank turns (SA1 / Sonic R), Falcon's turn timing
+def turn_anim(name, lean):
+    T = falcon_len(name)
+    yaw = falcon_track(name, 2, T)[:, 4]
+    keys = []
+    for f_ in range(T + 1):
+        t_ = f_ / float(T)
+        bank = lean * math.sin(math.pi * t_)
+        keys.append((f_, P(S, root=(8 * math.sin(math.pi * t_), math.degrees(yaw[f_]), bank), chest=(6, 0, -bank * 0.4), head=(-6, 0, -bank * 0.3),
+                           armL=(0.8, -0.6, 0.1), foreL=(0.6, -0.3, 0.6), armR=(-0.8, -0.6, 0.1), foreR=(-0.6, -0.3, 0.6)), "lin"))
+    anim(name, T, keys, keep_root=True)
+
+
+turn_anim("Turn", 12)
+turn_anim("TurnRun", 24)
 
 # ------------------------------------------------------------------ items and the rest of Falcon's leftovers (v61)
 # Picking up, throwing, swinging and shooting items, carrying crates, the hammer, the parasol, the Super Scope: about 45
@@ -693,7 +710,8 @@ _HANG = P(ground=0, hip=(0, 1.5, 0), chest=(-4, 0, 0), head=(-20, 0, 0), footL=4
 CARRY = reach(reach(_HANG, "L", _TH + np.array([0.7, 0, 0]), pole=(1, 0, -0.3)), "R", _TH + np.array([-0.7, 0, 0]), pole=(-1, 0, -0.3))
 CARRY2 = reach(reach(P(_HANG, thighL=(0.12, -1, -0.15), shinL=(0.07, -1, -0.45), thighR=(-0.12, -1, 0.2), shinR=(-0.07, -1, -0.1)),
                      "L", _TH + np.array([0.7, 0, 0]), pole=(1, 0, -0.3)), "R", _TH + np.array([-0.7, 0, 0]), pole=(-1, 0, -0.3))
-move("TailsCarry", "SpecialHiCatch", 70, [(0, CARRY), (12, CARRY2), (24, CARRY), (36, CARRY2), (48, CARRY), (60, CARRY2), (70, CARRY)], [],
+REACHUP = P(_HANG, armL=(0.45, 0.75, 0.3), foreL=(0.25, 1, 0.15), armR=(-0.45, 0.75, 0.3), foreR=(-0.25, 1, 0.15))   # v70: arms going up as Tails swoops in
+move("TailsCarry", "SpecialHiCatch", 80, [(0, REACHUP), (6, CARRY, "out"), (18, CARRY2), (30, CARRY), (42, CARRY2), (54, CARRY), (66, CARRY2), (80, CARRY)], [],
      prop=lambda f, W: (np.array(_TJ["pivot"]), f * 47.0))
 move("BounceAttack", "SpecialAirLw", 60, [(0, FALL), (4, tuck(90)), (60, tuck(1770), "lin")],
      [(3, 60, [ball(9, 70, 30, 80)])], ball=(5, 0))
@@ -743,13 +761,14 @@ SFX = {
     "DownSmash": [(8, W3, SW), (8, GRUNT[3], VOICE)],
     "NeutralAir": [(3, W1, SW)], "ForwardAir": [(9, W3, SW), (9, GRUNT[4], VOICE)], "BackAir": [(4, W3, SW)],
     "UpAir": [(4, W2, SW)], "DownAir": [(5, W3, SW)],
-    "HomingAttack": [(1, HOMING, SND), (1, GRUNT[0], VOICE)],
+    "HomingAttack": [(1, W2, SW)],   # v70: Melee whoosh, no voice (user: the SA1 clip sounded bad)
     "SpinDashCharge": [(7, SPIN_CHARGE, SND)] + [(7 + 26 * k, SPIN_CHARGE, SND) for k in range(1, 7)],
     "SpinDash": [(1, SPIN_RELEASE, SND)],
     "PeelOutUp": [(1, LD_HOLD, SND), (9, LD_LAUNCH, SND), (9, GRUNT[2], VOICE)],
     "PeelOutSide": [(1, LD_HOLD, SND), (9, LD_LAUNCH, SND), (9, GRUNT[2], VOICE)],
     "LightDashCharge": [(2, LD_HOLD, SND)], "LightDash": [(1, LD_LAUNCH, SND), (1, GRUNT[1], VOICE)],
     "BounceAttack": [(3, W2, SW)],
+    "TailsCarry": [(1, W2, SW)],
 }
 
 
@@ -901,6 +920,8 @@ if __name__ == "__main__":
                 elif c["name"] == "Synchronous Timer":
                     cur += pc["params"]["Frame"]
                 else:
+                    if name in ("EscapeAir", "EscapeN") and pc["params"].get("Behavior") == 2:
+                        continue    # v70: no voice on dodges (it was a grunt, the same clip as neutral B)
                     for key in [k_ for k_ in pc["params"] if k_.startswith("SFX ID")]:
                         if 60000 <= pc["params"][key] < 70000:
                             sa.set_param(bts, pc, key, GRUNT[pc["params"][key] % 5])

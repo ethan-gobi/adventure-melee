@@ -64,15 +64,21 @@ def main():
                 c.press_button(B.BUTTON_R)            # held (never released) until k = 90
             if k == 90:
                 c.release_all()
-            if k == 140:
-                c.press_button(B.BUTTON_R)
-            if k == 146:
-                c.tilt_analog(MAIN, 0.5, 0.0)         # spot dodge
-            if k == 152:
-                c.release_all()
+            if "--fsmash" in sys.argv:
+                if 140 <= k < 143:
+                    c.tilt_analog(B.BUTTON_C, 1.0, 0.5)
+            else:
+                if k == 140:
+                    c.press_button(B.BUTTON_R)
+                if k == 146:
+                    c.tilt_analog(MAIN, 0.5, 0.0)         # spot dodge
+                if k == 152:
+                    c.release_all()
             c.flush()
-            if k in (-5, 3, 6, 12, 30, 60, 88, 92, 96, 150, 156, 160, 200):
+            if k in (-5, 3, 6, 12, 30, 60, 88, 92, 96, 150, 156, 160, 200) or ('--fsmash' in sys.argv and k in (145, 150, 155, 158, 165)):
                 st, fr, out = bones(r.m)
+                g = r.m.u32(0x80453080 + 0xB0); fdp = r.m.u32(g + 0x2C)
+                print("   vis toggles (prev,index):", [(r.m.u8(fdp + 0x5F4 + i * 2), r.m.u8(fdp + 0x5F5 + i * 2)) for i in range(8)], flush=True)
                 a = gs.players[1]
                 print(f"k{k:4} state {st} ({a.action.name}) anim frame {fr} pos y {float(a.position.y):.2f}", flush=True)
                 for b, v in out.items():

@@ -40,13 +40,16 @@ op_off = add(bytes([n + 5]))
 f8_off, is_off = add(bytes([n + 6])), add(bytes([n + 7]))   # Peel-Out figure-8, Insta-Shield
 lid_off = add(bytes([n + 8]))                                # v64: eyelids (blink, asleep)
 tails_off = add(bytes([n + 9 + i for i in range(max(1, n_tails))]))
+ret_off = add(bytes([n + 9 + n_tails]))                      # v70: Homing Attack reticle (the part after Tails)
+half_off = add(bytes([n + 10 + n_tails]))                    # v70: half-closed eyelids (attack face)
 sets0 = add(struct.pack(">IIII", n + 1, a_off, 1, b_off)); rel += [sets0 + 4, sets0 + 12]                 # group 0: body | ball
 sets1 = add(struct.pack(">IIIIII", 0, 0, 2, e_off, 1, is_off)); rel += [sets1 + 12, sets1 + 20]        # group 1: nothing | emerald + glint | Insta-Shield
 sets2 = add(struct.pack(">IIIIII", 0, 0, 1, t_off, 1, f8_off)); rel += [sets2 + 12, sets2 + 20]        # group 2: nothing | trail | figure-8
 sets3 = add(struct.pack(">IIII", 0, 0, 1, op_off)); rel += [sets3 + 12]                              # group 3: nothing | open mouth
-sets4 = add(struct.pack(">IIII", 0, 0, 1, lid_off)); rel += [sets4 + 12]                             # group 4: nothing | eyelids
+sets4 = add(struct.pack(">IIIIII", 0, 0, 1, lid_off, 1, half_off)); rel += [sets4 + 12, sets4 + 20]    # group 4: nothing | eyelids | half lids
 sets5 = add(struct.pack(">IIII", 0, 0, max(1, n_tails), tails_off)); rel += [sets5 + 12]            # group 5: nothing | Tails
-t01 = add(struct.pack(">IIIIIIIIIIII", 2, sets0, 3, sets1, 3, sets2, 2, sets3, 2, sets4, 2, sets5)); rel += [t01 + 4, t01 + 12, t01 + 20, t01 + 28, t01 + 36, t01 + 44]
+sets6 = add(struct.pack(">IIII", 0, 0, 1, ret_off)); rel += [sets6 + 12]                               # group 6: nothing | reticle
+t01 = add(struct.pack(">IIIIIIIIIIIIII", 2, sets0, 3, sets1, 3, sets2, 2, sets3, 3, sets4, 2, sets5, 2, sets6)); rel += [t01 + 4, t01 + 12, t01 + 20, t01 + 28, t01 + 36, t01 + 44, t01 + 52]
 for ti, name in ((0, "HighPoly"), (1, "LowPoly"), (2, "MetalPoly"), (3, "MetalMain")):
     ptr = costumes + ti * 4
     if ptr not in rel:
@@ -55,10 +58,10 @@ for ti, name in ((0, "HighPoly"), (1, "LowPoly"), (2, "MetalPoly"), (3, "MetalMa
     if ti < 2:
         new = t01
     else:
-        new = add(struct.pack(">IIIIIIIIIIII", u(t), u(t + 4), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)); rel += [new + 4]      # metal: old group kept, empty groups 1-5
+        new = add(struct.pack(">IIIIIIIIIIIIII", u(t), u(t + 4), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)); rel += [new + 4]      # metal: old group kept, empty groups 1-6
     data[ptr:ptr + 4] = struct.pack(">I", new)
-    print(f"{name}: table 0x{t:X} -> 0x{new:X} (6 groups)")
-data[L:L + 4] = struct.pack(">I", 6)
+    print(f"{name}: table 0x{t:X} -> 0x{new:X} (7 groups)")
+data[L:L + 4] = struct.pack(">I", 7)
 out = struct.pack(">5I", 0x20 + len(data) + 4 * len(rel) + len(tail), len(data), len(rel), nroot, nref) + bytes(raw[20:0x20]) + bytes(data) + struct.pack(f">{len(rel)}I", *rel) + tail
 open(dst, "wb").write(out)
-print(f"lookup groups 1 -> 6; Tails parts {n_tails}; {src}: {len(raw)} -> {len(out)} bytes")
+print(f"lookup groups 1 -> 7; Tails parts {n_tails}; {src}: {len(raw)} -> {len(out)} bytes")
